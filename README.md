@@ -1,2 +1,4 @@
 # BML_HPF
-cs698s project 
+
+->  Edward Implmentation for "Scalable Recommendation with Hierarchical Poisson Factorization"
+->  
