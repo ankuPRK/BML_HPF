@@ -57,13 +57,14 @@ V = Gamma(alpha=tf.zeros([K, N]), beta=tf.ones([K, N]))
 temp = tf.matmul(U,V)
 # X = tf.placeholder(tf.int32, Poisson(lam=temp, value=tf.zeros_like(temp)))
 X = Poisson(lam=temp, value=tf.zeros_like(temp))
+
 # print U
 # print V
-q_U = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([M, K]))), beta=tf.exp(tf.Variable(tf.ones([M, K]))))
-q_V = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([K, N]))), beta=tf.exp(tf.Variable(tf.ones([K, N]))))
+qU = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([M, K]))), beta=tf.exp(tf.Variable(tf.ones([M, K]))))
+qV = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([K, N]))), beta=tf.exp(tf.Variable(tf.ones([K, N]))))
 
-inference = ed.VariationalInference({U: q_U, V: q_V}, data={X: X_train})
-inference.run(n_iter=1000)
+inference = ed.VariationalInference({U: qU, V: qV}, data={X: X_train})
+# inference.run(n_iter=1000)
 
 # X_post = ed.copy(X, {U: q_U, V: q_V})
 # print ed.evaluate('log_likelihood', data={X_post: X_train})
