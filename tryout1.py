@@ -50,7 +50,7 @@ def _sample_n(self, n=1, seed=None):
   # set shape from unknown shape
   batch_event_shape = self.get_batch_shape().concatenate(self.get_event_shape())
   shape = tf.concat(0, [tf.expand_dims(n, 0),
-                        tf.constant(batch_event_shape.as_list(), dtype=tf.int32)])
+                        tf.constant(batch_event_shape.as_list(), dtype=tf.float32)])
   val = tf.reshape(val, shape)
   return val
 
@@ -104,18 +104,20 @@ qU_var_beta = tf.exp(tf.Variable(tf.ones([B, D])))
 qU = Gamma(alpha=qU_var_alpha, beta=qU_var_beta)
 qV = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
 
-R_ph = tf.placeholder(tf.int32, [B])
+R_ph = tf.placeholder(tf.float32, [B, M])
 inference_global = ed.KLqp({V: qV}, data={R: R_ph, U: qU})
 inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
 
-inference_global.initialize(scale={R: float(N) / B, V: float(N) / B})
-inference_local.initialize(scale={R: float(N) / B, V: float(N) / B})
+inference_global.initialize(scale={R: tf.reshape(tf.cast([float(N)/B, float(M)], tf.float32), [10,100])}, debug=True)
+inference_local.initialize(scale={R: float(N) / B, U: float(N) / B}, debug=True)
 
 qU_alpha_init = tf.initialize_variables([qU_var_alpha])
 qU_beta_init = tf.initialize_variables([qU_var_beta])
 
+k = 0
 for i in range(1000):
-	R_batch = next_batch(size=B)
+	R_batch = R_true[k:k+B+1][:]
+	k += B + 1
 	for j in range(10): # make local inferences
 		inference_local.update(feed_dict={R_ph: R_batch})
 	# update global parameters
