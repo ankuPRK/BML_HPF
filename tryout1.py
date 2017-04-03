@@ -65,18 +65,20 @@ V_true = build_Matrix(M, D)
 
 # DATA
 R_true = build_toy_dataset(U_true, V_true)
-print np.shape(R_true)
+# print np.shape(R_true)
 # I_train = get_indicators(N, M)
 # I_test = 1 - I_train
 
 # MODEL
 I = tf.placeholder(tf.float32, [N, M])
-U = Gamma(alpha=tf.zeros([N, D]), beta=tf.ones([N, D]))
 V = Gamma(alpha=tf.zeros([M, D]), beta=tf.ones([M, D]))
+U = Gamma(alpha=tf.zeros([B, D]), beta=tf.ones([B, D]))
 
-Poisson._sample_n = _sample_n
+# Poisson._sample_n = _sample_n
 # sess = ed.get_session()
-temp = tf.matmul(U, np.transpose(V))
+temp = tf.matmul(U, tf.transpose(V))
+# temp = tf.gather(U, V)
+# print temp
 # temp2 = tf.matmul(tf.transpose(U), V)
 # U_sample = U.sample()
 # V_sample = V.sample()
@@ -91,49 +93,58 @@ temp = tf.matmul(U, np.transpose(V))
 # 	for j in range(0, M):
 # 		values[i][j] = int(poisson.rvs(t[i][j], size=1))
 # temp = tf.tile(tf.matmul(tf.transpose(U), V),1)
-R = Poisson(lam=temp)
-print R
+R = Poisson(lam=temp, value=tf.zeros_like(temp))
+# print R
 # INFERENCE
-qU = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([N, D]))), beta=tf.exp(tf.Variable(tf.ones([N, D]))))
+# qU = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([N, D]))), beta=tf.exp(tf.Variable(tf.ones([N, D]))))
+# qV = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
+qU_var_alpha = tf.exp(tf.Variable(tf.zeros([B, D])))
+qU_var_beta = tf.exp(tf.Variable(tf.ones([B, D])))
+
+qU = Gamma(alpha=qU_var_alpha, beta=qU_var_beta)
 qV = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
 
-inference_global = ed.KLqp({U: qU}, data={R: R_tru, V: qV})
-inference_local = ed.KLqp({V: qV}, data={x: x_ph, U: qU})
+R_ph = tf.placeholder(tf.int32, [B])
+inference_global = ed.KLqp({V: qV}, data={R: R_ph, U: qU})
+inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
 
 inference_global.initialize(scale={R: float(N) / B, V: float(N) / B})
 inference_local.initialize(scale={R: float(N) / B, V: float(N) / B})
 
-qz_init = tf.initialize_variables([qz_variables])
-for _ in range(1000):
-	x_batch = next_batch(size=M)
-	for _ in range(10): # make local inferences
-		inference_local.update(feed_dict={x_ph: x_batch})
+qU_alpha_init = tf.initialize_variables([qU_var_alpha])
+qU_beta_init = tf.initialize_variables([qU_var_beta])
+
+for i in range(1000):
+	R_batch = next_batch(size=B)
+	for j in range(10): # make local inferences
+		inference_local.update(feed_dict={R_ph: R_batch})
 	# update global parameters
-	inference_global.update(feed_dict={x_ph: x_batch})
+	inference_global.update(feed_dict={R_ph: R_batch})
 	# reinitialize the local factors
-	qz_init.run()
+	qU_alpha_init.run()
+	qU_beta_init.run()
 # inference = ed.VariationalInference({U: qU, V: qV}, data={R: R_true})
 # inference.run()
 
 # CRITICISM
 # qR = Normal(mu=tf.matmul(tf.transpose(qU), qV), sigma=tf.ones([N, M]))
-temp = tf.matmul(tf.transpose(qU), qV)
-qR = Poisson(lam=temp, value=temp)
-# qR = tf.matmul(tf.transpose(qU), qV)
+# temp = tf.matmul(tf.transpose(qU), qV)
+# qR = Poisson(lam=temp, value=temp)
+# # qR = tf.matmul(tf.transpose(qU), qV)
 
-print("Mean squared error on test data:")
-print(ed.evaluate('mean_squared_error', data={qR: R_true, I: I_test}))
+# print("Mean squared error on test data:")
+# print(ed.evaluate('mean_squared_error', data={qR: R_true, I: I_test}))
 
-f = plt.figure("True")
-plt.imshow(R_true)
-f.show()
+# f = plt.figure("True")
+# plt.imshow(R_true)
+# f.show()
 
-f = plt.figure("Estimated")
-R_est = tf.matmul(tf.transpose(qU), qV).eval()
-plt.imshow(R_est)
-f.show()
+# f = plt.figure("Estimated")
+# R_est = tf.matmul(tf.transpose(qU), qV).eval()
+# plt.imshow(R_est)
+# f.show()
 
-raw_input()
+# raw_input()
 
 
 
