@@ -62,6 +62,13 @@ def build_small_dataset():
 		# U4	1	-	-	4
 		# U5	-	1	5	4	
 	X_train=np.array([5,3,0,1,4,0,0,1,1,1,0,5,1,0,0,4,0,1,5,4]).reshape((5,4))
+		# 	D1	D2	D3	D4
+		# U1	4.97	2.98	2.18	0.98
+		# U2	3.97	2.40	1.97	0.99
+		# U3	1.02	0.93	5.32	4.93
+		# U4	1.00	0.85	4.59	3.93
+		# U5	1.36	1.07	4.89	4.12
+
 	return X_train, 5,4
 
 if __name__ == '__main__':
@@ -100,7 +107,7 @@ if __name__ == '__main__':
 	bar = progressbar.ProgressBar()
 	iteration = 0
 	curr = time()
-	for iteration in bar(range(1000)):
+	for iteration in bar(range(20000)):
 		for k in range(0, K):
 			#s = 0
 			#for d in range(0, D):
@@ -130,9 +137,15 @@ if __name__ == '__main__':
 			b_v[k,:] = bv_0 + s
 		prev = curr
 		curr = time()
-		print("Iteration " + str(iteration) + ": time taken(in s): " + str(curr-prev))
-	# print a_u
-	f = plt.figure("True")
-	plt.imshow(X_train)
-	f.show()
+#		print("Iteration " + str(iteration) + ": time taken(in s): " + str(curr-prev))
+	print a_u
+	print b_u
+
+
+#max vals:
+	u_s = (a_u - 1.0) / b_u
+	v_s = (a_v - 1.0) / b_v
+	X_new = np.dot(u_s,v_s)
+	print X_train
+	print X_new
 
