@@ -54,6 +54,16 @@ def get_list_of_nonzeros(X):
 				ls_nz_D[j].append(i)
 	return ls_nz_V, ls_nz_D
 
+def build_small_dataset():
+		# 	D1	D2	D3	D4
+		# U1	5	3	-	1
+		# U2	4	-	-	1
+		# U3	1	1	-	5
+		# U4	1	-	-	4
+		# U5	-	1	5	4	
+	X_train=np.array([5,3,0,1,4,0,0,1,1,1,0,5,1,0,0,4,0,1,5,4]).reshape((5,4))
+	return X_train, 5,4
+
 if __name__ == '__main__':
 
 	V = int(sys.argv[1])
@@ -65,7 +75,9 @@ if __name__ == '__main__':
 	V_true = build_Matrix(K, D)
 
 	# DATA
-	X_train = build_toy_dataset(U_true, V_true)
+	#X_train = build_toy_dataset(U_true, V_true)
+	X_train,V,D = build_small_dataset()
+	print X_train
 	# I_train = get_indicators(N, M)
 	# I_test = 1 - I_train
 
