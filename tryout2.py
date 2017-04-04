@@ -38,8 +38,12 @@ mu = Normal(mu=tf.zeros([K, D]), sigma=tf.ones([K, D]))
 sigma = InverseGamma(alpha=tf.ones([K, D]), beta=tf.ones([K, D]))
 cat = Categorical(logits=tf.zeros([N, K]))
 
-t1 = tf.Variable(mu)
-t2 = tf.Variable(sigma)
+# t1 = tf.Variable(mu)
+# t2 = tf.Variable(sigma)
+I1 = tf.placeholder(tf.float32, [K, D])
+t1 = mu * I1
+I2 = tf.placeholder(tf.float32, [K, D])
+t2 = sigma * I2
 components = [
     MultivariateNormalDiag(mu=tf.ones([N, 1]) * t1[k],
                            diag_stdev=tf.ones([N, 1]) * t2[k])

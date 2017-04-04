@@ -58,7 +58,7 @@ M = int(sys.argv[1])
 N = int(sys.argv[2])
 
 D = 25  # number of latent factors
-B = 10
+B = N
 # true latent factors
 U_true = build_Matrix(N, D)
 V_true = build_Matrix(M, D)
@@ -104,29 +104,36 @@ qU_var_beta = tf.exp(tf.Variable(tf.ones([B, D])))
 qU = Gamma(alpha=qU_var_alpha, beta=qU_var_beta)
 qV = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
 
-R_ph = tf.placeholder(tf.float32, [B, M])
-inference_global = ed.KLqp({V: qV}, data={R: R_ph, U: qU})
-inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
+# R_ph = tf.placeholder(tf.float32, [B, M])
+# inference_global = ed.KLqp({V: qV}, data={R: R_ph, U: qU})
+# inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
 
-inference_global.initialize(scale={R: tf.reshape(tf.cast([float(N)/B, float(M)], tf.float32), [10,100])}, debug=True)
-inference_local.initialize(scale={R: float(N) / B, U: float(N) / B}, debug=True)
+# temp = []
+# for i in range(0, M):
+# 	temp.append(float(N)/B)
 
-qU_alpha_init = tf.initialize_variables([qU_var_alpha])
-qU_beta_init = tf.initialize_variables([qU_var_beta])
+# temp = tf.cast(temp, tf.float32)
+# print R
+# print float(N) / B
+# inference_global.initialize(scale={R: float(N) / B, U: float(N) / B}, debug=True)
+# inference_local.initialize(scale={R: float(N) / B, U: float(N) / B}, debug=True)
 
-k = 0
-for i in range(1000):
-	R_batch = R_true[k:k+B+1][:]
-	k += B + 1
-	for j in range(10): # make local inferences
-		inference_local.update(feed_dict={R_ph: R_batch})
-	# update global parameters
-	inference_global.update(feed_dict={R_ph: R_batch})
-	# reinitialize the local factors
-	qU_alpha_init.run()
-	qU_beta_init.run()
-# inference = ed.VariationalInference({U: qU, V: qV}, data={R: R_true})
-# inference.run()
+# qU_alpha_init = tf.initialize_variables([qU_var_alpha])
+# qU_beta_init = tf.initialize_variables([qU_var_beta])
+
+# k = 0
+# for i in range(1000):
+# 	R_batch = R_true[k:k+B+1][:]
+# 	k += B + 1
+# 	for j in range(10): # make local inferences
+# 		inference_local.update(feed_dict={R_ph: R_batch})
+# 	# update global parameters
+# 	inference_global.update(feed_dict={R_ph: R_batch})
+# 	# reinitialize the local factors
+# 	qU_alpha_init.run()
+# 	qU_beta_init.run()
+inference = ed.KLqp({U: qU, V: qV}, data={R: R_true})
+inference.run()
 
 # CRITICISM
 # qR = Normal(mu=tf.matmul(tf.transpose(qU), qV), sigma=tf.ones([N, M]))

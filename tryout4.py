@@ -24,9 +24,9 @@ def get_indicators(N, M, prob_std=0.5):
   return ind
 
 
-N = 50  # number of users
-M = 60  # number of movies
-D = 3  # number of latent factors
+N = 100  # number of users
+M = 200  # number of movies
+D = 25  # number of latent factors
 
 # true latent factors
 U_true = np.random.randn(D, N)
@@ -58,9 +58,13 @@ qR = Normal(mu=tf.matmul(tf.transpose(qU), qV), sigma=tf.ones([N, M]))
 print("Mean squared error on test data:")
 print(ed.evaluate('mean_squared_error', data={qR: R_true, I: I_test}))
 
-plt.imshow(R_true, cmap='hot')
-plt.show()
+f = plt.figure("True")
+plt.imshow(R_true)
+f.show()
 
+f = plt.figure("Estimated")
 R_est = tf.matmul(tf.transpose(qU), qV).eval()
-plt.imshow(R_est, cmap='hot')
-plt.show()
+plt.imshow(R_est)
+f.show()
+
+raw_input()

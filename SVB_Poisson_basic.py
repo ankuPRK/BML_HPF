@@ -54,71 +54,48 @@ b_u = np.random.rand(V, K)
 a_v = np.random.rand(K, D)
 b_v = np.random.rand(K, D)
 
-au_0 = 0.1
-bu_0 = 0.2
-av_0 = 0.1
-bv_0 = 0.2
+au_0 = 0.1		#Local
+bu_0 = 0.2		#Local
+av_0 = 0.1		#Global
+bv_0 = 0.2		#Global
 
-# print a_u
+print a_u
+
+sample_index = random.sample(range(0, D), D)
+# sample_index_k = random.sample(range(0, K), K)
 
 bar = progressbar.ProgressBar()
 iteration = 0
 for iteration in bar(range(1000)):
 	for k in range(0, K):
-		#s = 0
-		#for d in range(0, D):
-		s = np.sum(a_v[k,:]/b_v[k,:])
+		s = 0
+		for d in range(0, D):
+			s += a_v[k][d]/b_v[k][d]
 
 		for v in range(0, V):
 			p = 0
 			for d in range(0, D):
-				if X_train[v][d] > 0:
+				if X_train[v][d] > 0 and a_v[k][d] > 0 and b_v[k][d] > 0:
 					p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]))
 			
 			a_u[v][k] = au_0 + p
-		b_u[:,k] = bu_0 + s
+			b_u[v][k] = bu_0 + s
 
 	for k in range(0, K):
-		# s = 0
-		# for v in range(0, V):
-		s = np.sum(a_u[:,k]/b_u[:,k])
+		s = 0
+		for v in range(0, V):
+			s += a_u[v][k]/b_u[v][k]
 
 		for d in range(0, D):
-			# a_v[k][d] += av_0
+			a_v[k][d] += av_0
 		
 			p = 0
 			for v in range(0, V):	
-				if X_train[v][d] > 0:			
+				if X_train[v][d] > 0 and a_u[v][k] > 0 and b_u[v][k] > 0:			
 					p += X_train[v][d]*math.exp(digamma(a_u[v][k]) - np.log(b_u[v][k]))
 			
 			a_v[k][d] = av_0 + p
-		b_v[k,:] = bv_0 + s
+			b_v[k][d] = bv_0 + s
 	
 
-# print a_u
-f = plt.figure("True")
-plt.imshow(X_train)
-f.show()
-
-qU = Gamma(alpha=a_u, beta=b_u)
-qV = Gamma(alpha=a_v, beta=b_v)
-
-qU_sample = qU.sample()
-qV_sample = qV.sample()
-
-
-# qX_sample = np.array(tf.matmul(qU_sample, qV_sample))
-# X_est = np.zeros((V,D))
-
-
-# X_est = qX_sample.eval()
-# print X_est
-# X_est = np.random.poisson(qX_sample)
-# print X_est
-# f = plt.figure("Estimated")
-# # X_est = tf.matmul(qU, qV).eval()
-# plt.imshow(X_est)
-# f.show()
-
-# print abs(X_est - X_train)
-raw_input()
+print a_u
