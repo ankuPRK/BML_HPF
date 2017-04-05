@@ -18,6 +18,7 @@ from tensorflow.python.ops import random_ops
 from edward.models import Gamma, Poisson, Normal
 from scipy.stats import poisson
 
+sess = ed.get_session()
 
 def build_toy_dataset(U, V):
   R = np.dot(U, np.transpose(V))
@@ -38,33 +39,53 @@ def build_Matrix(n1, n2):
 
 	return X
 
+def build_small_dataset():
+		# 	D1	D2	D3	D4
+		# U1	5	3	-	1
+		# U2	4	-	-	1
+		# U3	1	1	-	5
+		# U4	1	-	-	4
+		# U5	-	1	5	4	
+	X_train=np.array([5,3,0,1,4,0,0,1,1,1,0,5,1,0,0,4,0,1,5,4]).reshape((5,4))
+		# 	D1	D2	D3	D4
+		# U1	4.97	2.98	2.18	0.98
+		# U2	3.97	2.40	1.97	0.99
+		# U3	1.02	0.93	5.32	4.93
+		# U4	1.00	0.85	4.59	3.93
+		# U5	1.36	1.07	4.89	4.12
+
+	return X_train, 5,4
 # def _sample_n(self, n, seed=None):
 #     return random_ops.random_poisson(
 #         self.rate, [n], dtype=self.dtype, seed=seed)
 
 def _sample_n(self, n=1, seed=None):
   # define Python function which returns samples as a Numpy array
-  np_sample = lambda lam, n: poisson.rvs(mu=lam, size=n, random_state=seed).astype(np.float32)
+	np_sample = lambda lam, n: poisson.rvs(mu=lam, size=n, random_state=seed).astype(np.float32)
   # wrap python function as tensorflow op
-  val = tf.py_func(np_sample, [self.lam, n], [tf.float32])[0]
+	val = tf.py_func(np_sample, [self.lam, n], [tf.float32])[0]
   # set shape from unknown shape
-  batch_event_shape = self.get_batch_shape().concatenate(self.get_event_shape())
-  shape = tf.concat(0, [tf.expand_dims(n, 0),
-                        tf.constant(batch_event_shape.as_list(), dtype=tf.float32)])
-  val = tf.reshape(val, shape)
-  return val
+	batch_event_shape = self.get_batch_shape().concatenate(self.get_event_shape())
+	shape = tf.concat(0, [tf.expand_dims(n, 0),
+					tf.constant(batch_event_shape.as_list(), 
+						dtype=tf.int32)])
+	# print batch_event_shape
+	# print shape
+	val = tf.reshape(val, shape)
+	return val
 
-M = int(sys.argv[1])
-N = int(sys.argv[2])
+R_true, N, M = build_small_dataset()
+# M = int(sys.argv[1])
+# N = int(sys.argv[2])
 
 D = 25  # number of latent factors
 B = N
 # true latent factors
-U_true = build_Matrix(N, D)
-V_true = build_Matrix(M, D)
+# U_true = build_Matrix(N, D)
+# V_true = build_Matrix(M, D)
 
 # DATA
-R_true = build_toy_dataset(U_true, V_true)
+# R_true = build_toy_dataset(U_true, V_true)
 # print np.shape(R_true)
 # I_train = get_indicators(N, M)
 # I_test = 1 - I_train
@@ -74,7 +95,7 @@ I = tf.placeholder(tf.float32, [N, M])
 V = Gamma(alpha=tf.zeros([M, D]), beta=tf.ones([M, D]))
 U = Gamma(alpha=tf.zeros([B, D]), beta=tf.ones([B, D]))
 
-# Poisson._sample_n = _sample_n
+Poisson._sample_n = _sample_n
 # sess = ed.get_session()
 temp = tf.matmul(U, tf.transpose(V))
 # temp = tf.gather(U, V)
@@ -93,7 +114,9 @@ temp = tf.matmul(U, tf.transpose(V))
 # 	for j in range(0, M):
 # 		values[i][j] = int(poisson.rvs(t[i][j], size=1))
 # temp = tf.tile(tf.matmul(tf.transpose(U), V),1)
-R = Poisson(lam=temp, value=tf.zeros_like(temp))
+# R = Poisson(lam=temp, value=tf.zeros_like(temp))
+R = Poisson(lam=temp)
+# R = Poisson(lam=tf.constant(1.0))
 # print R
 # INFERENCE
 # qU = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([N, D]))), beta=tf.exp(tf.Variable(tf.ones([N, D]))))
@@ -108,30 +131,30 @@ qV = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([M, D]))), beta=tf.exp(tf.Variable(
 # inference_global = ed.KLqp({V: qV}, data={R: R_ph, U: qU})
 # inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
 
-# temp = []
-# for i in range(0, M):
-# 	temp.append(float(N)/B)
+# # temp = []
+# # for i in range(0, M):
+# # 	temp.append(float(N)/B)
 
-# temp = tf.cast(temp, tf.float32)
-# print R
-# print float(N) / B
+# # temp = tf.cast(temp, tf.float32)
+# # print R
+# # print float(N) / B
 # inference_global.initialize(scale={R: float(N) / B, U: float(N) / B}, debug=True)
 # inference_local.initialize(scale={R: float(N) / B, U: float(N) / B}, debug=True)
 
-# qU_alpha_init = tf.initialize_variables([qU_var_alpha])
-# qU_beta_init = tf.initialize_variables([qU_var_beta])
+# # qU_alpha_init = tf.initialize_variables([qU_var_alpha])
+# # qU_beta_init = tf.initialize_variables([qU_var_beta])
 
-# k = 0
-# for i in range(1000):
-# 	R_batch = R_true[k:k+B+1][:]
-# 	k += B + 1
-# 	for j in range(10): # make local inferences
-# 		inference_local.update(feed_dict={R_ph: R_batch})
-# 	# update global parameters
-# 	inference_global.update(feed_dict={R_ph: R_batch})
-# 	# reinitialize the local factors
-# 	qU_alpha_init.run()
-# 	qU_beta_init.run()
+# # k = 0
+# # for i in range(1000):
+# # 	R_batch = R_true[k:k+B+1][:]
+# # 	k += B + 1
+# # 	for j in range(10): # make local inferences
+# # 		inference_local.update(feed_dict={R_ph: R_batch})
+# # 	# update global parameters
+# # 	inference_global.update(feed_dict={R_ph: R_batch})
+# # 	# reinitialize the local factors
+# # 	qU_alpha_init.run()
+# # 	qU_beta_init.run()
 inference = ed.KLqp({U: qU, V: qV}, data={R: R_true})
 inference.run()
 
