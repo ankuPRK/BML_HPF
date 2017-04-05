@@ -88,7 +88,7 @@ if __name__ == '__main__':
 	# I_train = get_indicators(N, M)
 	# I_test = 1 - I_train
 
-	epsillon = 0.1
+	epsillon = 1.0
 
 	a_u = np.random.rand(V, K)
 	b_u = np.random.rand(V, K)
@@ -107,7 +107,7 @@ if __name__ == '__main__':
 	bar = progressbar.ProgressBar()
 	iteration = 0
 	curr = time()
-	for iteration in bar(range(20000)):
+	for iteration in bar(range(5000)):
 		for k in range(0, K):
 			#s = 0
 			#for d in range(0, D):
@@ -115,10 +115,14 @@ if __name__ == '__main__':
 
 			for v in range(0, V):
 				p = 0
+				# den = np.sum(np.exp(digamma(a_v[k,:]) - np.log(b_v[k,:])))
+				den = np.sum(np.exp( digamma(a_v[k,:]) - np.log(b_v[k,:]) + (digamma(a_u[v][k]) - np.log(b_u[v][k]) )))
 				for d in ls_nz_V[v]:
-					p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]))
-				
-				a_u[v][k] = au_0 + p
+					# p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d])) / den
+					p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]) + digamma(a_u[v][k]) - np.log(b_u[v][k])) / den
+
+					# print p
+				a_u[v][k] = au_0 + epsillon*p
 			b_u[:,k] = bu_0 + s
 
 		for k in range(0, K):
@@ -130,22 +134,26 @@ if __name__ == '__main__':
 				# a_v[k][d] += av_0
 			
 				p = 0
+				# den = np.sum(np.exp(digamma(a_u[:,k]) - np.log(b_u[:,k])))
+				den = np.sum(np.exp( digamma(a_v[k][d]) - np.log(b_v[k][d]) + (digamma(a_u[:,k]) - np.log(b_u[:,k]) )))
 				for v in ls_nz_D[d]:	
-					p += X_train[v][d]*math.exp(digamma(a_u[v][k]) - np.log(b_u[v][k]))
+					# p += X_train[v][d]*math.exp(digamma(a_u[v][k]) - np.log(b_u[v][k])) / den 
+					p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]) + digamma(a_u[v][k]) - np.log(b_u[v][k])) / den
 				
-				a_v[k][d] = av_0 + p
+				a_v[k][d] = av_0 + epsillon*p
 			b_v[k,:] = bv_0 + s
 		prev = curr
 		curr = time()
 #		print("Iteration " + str(iteration) + ": time taken(in s): " + str(curr-prev))
-	print a_u
-	print b_u
+	# print a_u
+	# print b_u
 
 
 #max vals:
 	u_s = (a_u - 1.0) / b_u
 	v_s = (a_v - 1.0) / b_v
-	X_new = np.dot(u_s,v_s)
+	temp = np.dot(u_s,v_s)
+	X_new = np.random.poisson(temp)
 	print X_train
 	print X_new
 
