@@ -74,19 +74,21 @@ def _sample_n(self, n=1, seed=None):
 	val = tf.reshape(val, shape)
 	return val
 
-R_true, N, M = build_small_dataset()
+# R_true, N, M = build_small_dataset()
+M = int(sys.argv[1])
+N = int(sys.argv[2])
+D = int(min(M,N)/2) # number of latent factors
+U_true = build_Matrix(N, D)
+V_true = build_Matrix(M, D)
+R_true = build_toy_dataset(U_true, V_true)
 R_true = np.array(R_true, dtype=np.float32)
-# M = int(sys.argv[1])
-# N = int(sys.argv[2])
 
-D = 25  # number of latent factors
 B = N
 # true latent factors
 # U_true = build_Matrix(N, D)
 # V_true = build_Matrix(M, D)
 
 # DATA
-# R_true = build_toy_dataset(U_true, V_true)
 # print np.shape(R_true)
 # I_train = get_indicators(N, M)
 # I_test = 1 - I_train
@@ -125,19 +127,28 @@ R = tf.reshape(R, [N, M])
 # R = Poisson(lam=tf.constant(1.0))
 # print R
 # INFERENCE
-# qU = Gamma(alpha=tf.exp(tf.Variable(tf.ones([N, D]))), beta=tf.exp(tf.Variable(tf.ones([N, D]))))
-# qV = Gamma(alpha=tf.exp(tf.Variable(tf.ones([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
-# qU = Gamma(alpha=tf.Variable(tf.zeros([N, D])), beta=tf.Variable(tf.ones([N, D])))
-# qV = Gamma(alpha=tf.Variable(tf.zeros([M, D])), beta=tf.Variable(tf.ones([M, D])))
-qU_var_alpha = tf.Variable(tf.exp(tf.ones([B, D])))
-qU_var_beta = tf.Variable(tf.exp(tf.ones([B, D])))
-
-qU = Gamma(alpha=qU_var_alpha, beta=qU_var_beta)
+qU = Gamma(alpha=tf.exp(tf.Variable(tf.ones([N, D]))), beta=tf.exp(tf.Variable(tf.ones([N, D]))))
 qV = Gamma(alpha=tf.exp(tf.Variable(tf.ones([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
 
-R_ph = tf.placeholder(tf.float32, [B, M])
-inference_global = ed.KLqp({V: qV}, data={R: R_ph, U: qU})
-inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
+#Define qU and qV differently
+# qU = Gamma(alpha=tf.Variable(tf.ones([N, D])), beta=tf.exp(tf.Variable(tf.ones([N, D]))))
+# qV = Gamma(alpha=tf.exp(tf.Variable(tf.ones([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
+
+# qU = Gamma(alpha=tf.Variable(tf.zeros([N, D])), beta=tf.Variable(tf.ones([N, D])))
+# qV = Gamma(alpha=tf.Variable(tf.zeros([M, D])), beta=tf.Variable(tf.ones([M, D])))
+# qU_var_alpha_U = tf.Variable(tf.exp(tf.ones([B, D])))
+# qU_var_beta_U = tf.Variable(tf.exp(tf.ones([B, D])))
+
+# qU_var_alpha_V = tf.Variable(tf.exp(tf.ones([M, D])))
+# qU_var_beta_V = tf.Variable(tf.exp(tf.ones([M, D])))
+
+# qU = Gamma(alpha=qU_var_alpha_U, beta=qU_var_beta_U)
+# qV = Gamma(alpha=qU_var_alpha_V, beta=qU_var_beta_V)
+# qV = Gamma(alpha=tf.exp(tf.Variable(tf.ones([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
+
+# R_ph = tf.placeholder(tf.float32, [B, M])
+# inference_global = ed.KLqp({V: qV}, data={R: R_ph, U: qU})
+# inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
 
 # # # # temp = []
 # # # # for i in range(0, M):
@@ -149,10 +160,10 @@ inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
 # inference_global.initialize()
 # inference_local.initialize()
 
-qU_alpha_init = tf.variables_initializer([qU_var_alpha])
-qU_beta_init = tf.variables_initializer([qU_var_beta])
-inference = ed.KLqp({V: qV}, data={R: R_true, U: qU})
-inference.run(n_iter=2500)
+# qU_alpha_init = tf.variables_initializer([qU_var_alpha])
+# qU_beta_init = tf.variables_initializer([qU_var_beta])
+# inference = ed.KLqp({V: qV}, data={R: R_true, U: qU})
+# inference.run(n_iter=2500)
 # # inference = ed.KLqp({U: qU}, data={R: R_true, V: qV})
 # # inference.run(n_iter=2500)
 # # # # # k = 0
@@ -178,14 +189,39 @@ inference.run(n_iter=2500)
 # print qU
 # print V
 # print qV
-# inference = ed.KLqp({U: qU, V: qV}, data={R: R_true})
-# inference.run(n_iter=2500)
+inference = ed.KLqp({U: qU, V: qV}, data={R: R_true})
+inference.run(n_iter=2500)
 
+qU_sample = qU.sample()
+qV_sample = qV.sample()
+
+qU_sample = qU_sample.eval()
+qV_sample = qV_sample.eval()
+
+t = np.zeros((N, M), dtype=np.float32)
+for n in range(0, N):
+	for m in range(0, M):
+		s = 0
+		for d in range(0, D):
+			s += qU_sample[n][d]*qV_sample[m][d]
+
+		t[n][m] = float(s)
+# t = np.dot(qU_sample,np.transpose(qU_sample))
+R_new = np.random.poisson(t)
+print R_true
+print R_new
+
+# print qV.eval()
+# print qV.eval()
+# print qU_var_alpha_U.eval()
+# print qU_var_beta_U.eval()
+# print qU_var_alpha_V.eval()
+# print qU_var_beta_V.eval()
 # CRITICISM
 # qR = Normal(mu=tf.matmul(tf.transpose(qU), qV), sigma=tf.ones([N, M]))
 # temp = tf.matmul(tf.transpose(qU), qV)
 # temp = tf.matmul(qU, tf.transpose(qV))
-# qR = Poisson(lam=temp)
+# qR = Poisson(lam=temp, value=tf.zeros_like(temp))
 # R_new = qR.sample()
 # print R_new.eval()
 
