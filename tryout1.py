@@ -75,6 +75,7 @@ def _sample_n(self, n=1, seed=None):
 	return val
 
 R_true, N, M = build_small_dataset()
+R_true = np.array(R_true, dtype=np.float32)
 # M = int(sys.argv[1])
 # N = int(sys.argv[2])
 
@@ -92,10 +93,12 @@ B = N
 
 # MODEL
 I = tf.placeholder(tf.float32, [N, M])
-V = Gamma(alpha=tf.zeros([M, D]), beta=tf.ones([M, D]))
-U = Gamma(alpha=tf.zeros([B, D]), beta=tf.ones([B, D]))
+# U = Gamma(alpha=tf.ones([N, M]), beta=tf.ones([N, M]))
+U = Gamma(alpha=tf.ones([N, D]), beta=tf.ones([N, D]))
+V = Gamma(alpha=tf.ones([M, D]), beta=tf.ones([M, D]))
 
-Poisson._sample_n = _sample_n
+
+# Poisson._sample_n = _sample_n
 # sess = ed.get_session()
 temp = tf.matmul(U, tf.transpose(V))
 # temp = tf.gather(U, V)
@@ -114,58 +117,69 @@ temp = tf.matmul(U, tf.transpose(V))
 # 	for j in range(0, M):
 # 		values[i][j] = int(poisson.rvs(t[i][j], size=1))
 # temp = tf.tile(tf.matmul(tf.transpose(U), V),1)
-# R = Poisson(lam=temp, value=tf.zeros_like(temp))
-R = Poisson(lam=temp)
-R = tf.cast(R, tf.int32)
-print R
+R = Poisson(lam=temp, value=tf.zeros_like(temp))
+R = tf.reshape(R, [N, M])
+# R = Poisson(lam=U, value=tf.zeros_like(U))
+# R = tf.cast(R, tf.int32)
+# print R
 # R = Poisson(lam=tf.constant(1.0))
 # print R
 # INFERENCE
-qU = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([N, D]))), beta=tf.exp(tf.Variable(tf.ones([N, D]))))
-qV = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
+# qU = Gamma(alpha=tf.exp(tf.Variable(tf.ones([N, D]))), beta=tf.exp(tf.Variable(tf.ones([N, D]))))
+# qV = Gamma(alpha=tf.exp(tf.Variable(tf.ones([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
 # qU = Gamma(alpha=tf.Variable(tf.zeros([N, D])), beta=tf.Variable(tf.ones([N, D])))
 # qV = Gamma(alpha=tf.Variable(tf.zeros([M, D])), beta=tf.Variable(tf.ones([M, D])))
-# qU_var_alpha = tf.Variable(tf.exp(tf.zeros([B, D])))
-# qU_var_beta = tf.Variable(tf.exp(tf.ones([B, D])))
+qU_var_alpha = tf.Variable(tf.exp(tf.ones([B, D])))
+qU_var_beta = tf.Variable(tf.exp(tf.ones([B, D])))
 
-# qU = Gamma(alpha=qU_var_alpha, beta=qU_var_beta)
-# qV = Gamma(alpha=tf.exp(tf.Variable(tf.zeros([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
+qU = Gamma(alpha=qU_var_alpha, beta=qU_var_beta)
+qV = Gamma(alpha=tf.exp(tf.Variable(tf.ones([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
 
-# R_ph = tf.placeholder(tf.int32, [B, M])
-# inference_global = ed.KLqp({V: qV}, data={R: R_ph, U: qU})
-# inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
+R_ph = tf.placeholder(tf.float32, [B, M])
+inference_global = ed.KLqp({V: qV}, data={R: R_ph, U: qU})
+inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
 
-# # # temp = []
-# # # for i in range(0, M):
-# # # 	temp.append(float(N)/B)
+# # # # temp = []
+# # # # for i in range(0, M):
+# # # # 	temp.append(float(N)/B)
 
-# # # temp = tf.cast(temp, tf.float32)
-# # # print R
-# # # print float(N) / B
-# inference_global.initialize(scale={R: float(N) / B, U: float(N) / B}, debug=True)
-# inference_local.initialize(scale={R: float(N) / B, U: float(N) / B}, debug=True)
+# # # # temp = tf.cast(temp, tf.float32)
+# # # # print R
+# # # # print float(N) / B
+# inference_global.initialize()
+# inference_local.initialize()
 
-# qU_alpha_init = tf.initialize_variables([qU_var_alpha])
-# qU_beta_init = tf.initialize_variables([qU_var_beta])
-
-# # # k = 0
+qU_alpha_init = tf.variables_initializer([qU_var_alpha])
+qU_beta_init = tf.variables_initializer([qU_var_beta])
+inference = ed.KLqp({V: qV}, data={R: R_true, U: qU})
+inference.run(n_iter=2500)
+# # inference = ed.KLqp({U: qU}, data={R: R_true, V: qV})
+# # inference.run(n_iter=2500)
+# # # # # k = 0
 # for i in range(1000):
-# 	# R_batch = R_true[k:k+B+1][:]
-# 	# k += B + 1
+# # 	# R_batch = R_true[k:k+B+1][:]
+# # 	# k += B + 1
 # 	R_batch = R_true
-# 	for j in range(10): # make local inferences
-# 		inference_local.update(feed_dict={R_ph: R_batch})
-# 	# update global parameters
+# 	for j in range(B): # make local inferences
+# 		inference_local.update(feed_dict={R_ph: R_batch, V: qV})
+# # 	# update global parameters
 # 	inference_global.update(feed_dict={R_ph: R_batch})
-# 	# reinitialize the local factors
+# # 	# reinitialize the local factors
 # 	qU_alpha_init.run()
 # 	qU_beta_init.run()
 # print R_true
-# R_true = np.array(R_true, dtype=np.float32)
+
 # print R_true
 # print R_true
-inference = ed.KLqp({U: qU, V: qV}, data={R: R_true})
-inference.run(n_iter=10000)
+# print temp
+# print R_true
+# print R
+# print U
+# print qU
+# print V
+# print qV
+# inference = ed.KLqp({U: qU, V: qV}, data={R: R_true})
+# inference.run(n_iter=2500)
 
 # CRITICISM
 # qR = Normal(mu=tf.matmul(tf.transpose(qU), qV), sigma=tf.ones([N, M]))
