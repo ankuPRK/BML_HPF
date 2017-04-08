@@ -15,6 +15,20 @@ from scipy.stats import poisson
 
 from scipy.special import digamma
 
+# def _sample_n(self, n=1, seed=None):
+#   # define Python function which returns samples as a Numpy array
+# 	np_sample = lambda lam, n: poisson.rvs(mu=lam, size=n, random_state=seed).astype(np.float32)
+#   # wrap python function as tensorflow op
+# 	val = tf.py_func(np_sample, [self.lam, n], [tf.float32])[0]
+#   # set shape from unknown shape
+# 	batch_event_shape = self.get_batch_shape().concatenate(self.get_event_shape())
+# 	shape = tf.concat(0, [tf.expand_dims(n, 0),
+# 					tf.constant(batch_event_shape.as_list(), 
+# 						dtype=tf.int32)])
+# 	# print batch_event_shape
+# 	# print shape
+# 	val = tf.reshape(val, shape)
+# 	return val
 
 def build_toy_dataset(U, V):
   R = np.dot(U, V)
@@ -73,22 +87,27 @@ def build_small_dataset():
 
 if __name__ == '__main__':
 
+	sess = ed.get_session()
+	# Poisson._sample_n = _sample_n
+
 	V = int(sys.argv[1])
 	D = int(sys.argv[2])
 	K = int(sys.argv[3])  # number of latent factors
 
-	# true latent factors
-	U_true = build_Matrix(V, K)
-	V_true = build_Matrix(K, D)
+	# # true latent factors
+	# U_true = build_Matrix(V, K)
+	# V_true = build_Matrix(K, D)
 
 	# DATA
-	# X_train = build_toy_dataset(U_true, V_true)
-	X_train,V,D = build_small_dataset()
+	X_train = build_Matrix(V, D)
+	# X_train = np.zeros((V,D))
+	# X_train,V,D = build_small_dataset()
+	# K = int(min(V,D)/2)
 	# print X_train
 	# I_train = get_indicators(N, M)
 	# I_test = 1 - I_train
 
-	epsillon = 0.1
+	epsillon = 1.0
 
 	a_u = np.random.rand(V, K)
 	b_u = np.random.rand(V, K)
@@ -115,10 +134,14 @@ if __name__ == '__main__':
 
 			for v in range(0, V):
 				p = 0
+				den = np.sum(np.exp(digamma(a_v[k,:]) - np.log(b_v[k,:])))
+				# den = np.sum(np.exp( digamma(a_v[k,:]) - np.log(b_v[k,:]) + (digamma(a_u[v][k]) - np.log(b_u[v][k]) )))
 				for d in ls_nz_V[v]:
-					p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]))
-				
-				a_u[v][k] = au_0 + p
+					p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d])) / den
+					# p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]) + digamma(a_u[v][k]) - np.log(b_u[v][k])) / den
+
+					# print p
+				a_u[v][k] = au_0 + epsillon*p
 			b_u[:,k] = bu_0 + s
 
 		for k in range(0, K):
@@ -130,10 +153,13 @@ if __name__ == '__main__':
 				# a_v[k][d] += av_0
 			
 				p = 0
+				den = np.sum(np.exp(digamma(a_u[:,k]) - np.log(b_u[:,k])))
+				# den = np.sum(np.exp( digamma(a_v[k][d]) - np.log(b_v[k][d]) + (digamma(a_u[:,k]) - np.log(b_u[:,k]) )))
 				for v in ls_nz_D[d]:	
-					p += X_train[v][d]*math.exp(digamma(a_u[v][k]) - np.log(b_u[v][k]))
+					p += X_train[v][d]*math.exp(digamma(a_u[v][k]) - np.log(b_u[v][k])) / den 
+					# p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]) + digamma(a_u[v][k]) - np.log(b_u[v][k])) / den
 				
-				a_v[k][d] = av_0 + p
+				a_v[k][d] = av_0 + epsillon*p
 			b_v[k,:] = bv_0 + s
 		prev = curr
 		curr = time()
@@ -143,16 +169,52 @@ if __name__ == '__main__':
 
 
 #max vals:
-	u_s = (a_u - 1.0) / b_u
-	v_s = (a_v - 1.0) / b_v
-	t = np.dot(u_s,v_s)
-
-	X_new = np.random.poisson(t)
-	print X_train
-	print X_new
-
-	print (np.sum((X_train - X_new)**2)/(V*D))
-
-#Posterior
+	# u_s = (a_u - 1.0) / b_u
+	# v_s = (a_v - 1.0) / b_v
+	# temp = np.dot(u_s,v_s)
 	qU = Gamma(alpha=a_u, beta=b_u)
 	qV = Gamma(alpha=a_v, beta=b_v)
+
+	qU_sample = qU.sample()
+	qV_sample = qV.sample()
+
+	avg_U = np.zeros((V,K))
+	avg_V = np.zeros((K,D))
+
+	n_sample = 5000
+	for i in range(n_sample):
+		avg_U += qU_sample.eval()
+		avg_V += qV_sample.eval()
+
+	avg_U /= n_sample
+	avg_V /= n_sample
+
+	temp = np.dot(avg_U, avg_V)
+	X_new = np.zeros((V,D))
+	for i in range(n_sample):
+		X_new += np.random.poisson(temp)
+
+	print X_train
+	print np.round(X_new / n_sample, 0)
+
+ 	# X_train2 = np.array(X_train, dtype=np.float32)
+
+	# qX = Poisson(lam=temp, value=tf.zeros_like(temp))
+	# qX = tf.reshape(qX, [V, D])
+	# qX = tf.cast(qX, tf.float32)
+
+	# # print("Mean squared error on test data:")
+	# print(ed.evaluate('mean_squared_error', data={qX: X_train2}))
+	# # print(ed.evaluate('log_likelihood'))
+
+	# qX = Poisson(lam=temp)
+	# qX = tf.reshape(qX, [V, D])
+	# qX = tf.cast(qX, tf.float32)
+
+	# # print("Mean squared error on test data:")
+	# print(ed.evaluate('mean_squared_error', data={qX: X_train2}))
+	# # print(ed.evaluate('log_likelihood'))
+
+	# # X_new = np.random.poisson(temp)
+	# print X_train
+	# print X_new
