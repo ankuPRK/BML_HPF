@@ -113,23 +113,25 @@ R = tf.reshape(R, [N, M])
 # qV = Gamma(alpha=tf.exp(tf.Variable(tf.ones([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
 
 #Define qU and qV differently
-qU = Gamma(alpha=tf.Variable(tf.ones([N, D])), beta=tf.Variable(tf.ones([N, D])))
-qV = Gamma(alpha=tf.Variable(tf.ones([M, D])), beta=tf.Variable(tf.ones([M, D])))
+qU_var_alpha = tf.Variable(tf.ones([B, D]))
+qU_var_beta = tf.Variable(tf.ones([B, D]))
+qV_var_alpha = tf.Variable(tf.ones([M, D]))
+qV_var_beta = tf.Variable(tf.ones([M, D]))
 
+# qU = Gamma(alpha=tf.Variable(tf.ones([N, D])), beta=tf.Variable(tf.ones([N, D])))
+# qV = Gamma(alpha=tf.Variable(tf.ones([M, D])), beta=tf.Variable(tf.ones([M, D])))
 
-# qU_var_alpha_U = tf.Variable(tf.exp(tf.ones([B, D])))
-# qU_var_beta_U = tf.Variable(tf.exp(tf.ones([B, D])))
+qU = Gamma(alpha=qU_var_alpha, beta=qU_var_beta)
+qV = Gamma(alpha=qV_var_alpha, beta=qV_var_beta)
 
-# qU_var_alpha_V = tf.Variable(tf.exp(tf.ones([M, D])))
-# qU_var_beta_V = tf.Variable(tf.exp(tf.ones([M, D])))
 
 # qU = Gamma(alpha=qU_var_alpha_U, beta=qU_var_beta_U)
 # qV = Gamma(alpha=qU_var_alpha_V, beta=qU_var_beta_V)
 # qV = Gamma(alpha=tf.exp(tf.Variable(tf.ones([M, D]))), beta=tf.exp(tf.Variable(tf.ones([M, D]))))
 
-# R_ph = tf.placeholder(tf.float32, [B, M])
-# inference_global = ed.KLqp({V: qV}, data={R: R_ph, U: qU})
-# inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
+R_ph = tf.placeholder(tf.float32, [B, M])
+inference_local = ed.KLqp({U: qU}, data={R: R_ph, V: qV})
+inference_global = ed.KLqp({V: qV}, data={R: R_ph, U: qU})
 
 # # # # temp = []
 # # # # for i in range(0, M):
@@ -138,30 +140,33 @@ qV = Gamma(alpha=tf.Variable(tf.ones([M, D])), beta=tf.Variable(tf.ones([M, D]))
 # # # # temp = tf.cast(temp, tf.float32)
 # # # # print R
 # # # # print float(N) / B
-# inference_global.initialize()
-# inference_local.initialize()
+inference_global.initialize(debug=True)
+inference_local.initialize(debug=True)
 
-# qU_alpha_init = tf.variables_initializer([qU_var_alpha])
-# qU_beta_init = tf.variables_initializer([qU_var_beta])
+qU_alpha_init = tf.variables_initializer([qU_var_alpha])
+qU_beta_init = tf.variables_initializer([qU_var_beta])
+
+qV_alpha_init = tf.variables_initializer([qV_var_alpha])
+qV_beta_init = tf.variables_initializer([qV_var_beta])
 # inference = ed.KLqp({V: qV}, data={R: R_true, U: qU})
 # inference.run(n_iter=2500)
 # # inference = ed.KLqp({U: qU}, data={R: R_true, V: qV})
 # # inference.run(n_iter=2500)
 # # # # # k = 0
-# for i in range(1000):
-# # 	# R_batch = R_true[k:k+B+1][:]
-# # 	# k += B + 1
-# 	R_batch = R_true
-# 	for j in range(B): # make local inferences
-# 		inference_local.update(feed_dict={R_ph: R_batch, V: qV})
-# # 	# update global parameters
-# 	inference_global.update(feed_dict={R_ph: R_batch})
-# # 	# reinitialize the local factors
-# 	qU_alpha_init.run()
-# 	qU_beta_init.run()
+for i in range(1000):
+# 	# R_batch = R_true[k:k+B+1][:]
+# 	# k += B + 1
+	R_batch = R_true
+	for j in range(B): # make local inferences
+		inference_local.update(feed_dict={R_ph: R_batch})
+# 	# update global parameters
+	inference_global.update(feed_dict={R_ph: R_batch})
+# 	# reinitialize the local factors
+	qU_alpha_init.run()
+	qU_beta_init.run()
 
-inference = ed.KLqp({U: qU, V: qV}, data={R: R_true})
-inference.run(n_iter=2500)
+# inference = ed.KLqp({U: qU, V: qV}, data={R: R_true})
+# inference.run(n_iter=2500)
 
 # qU_sample = qU.sample()
 # qV_sample = qV.sample()
