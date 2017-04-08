@@ -74,13 +74,14 @@ def _sample_n(self, n=1, seed=None):
 	val = tf.reshape(val, shape)
 	return val
 
-# R_true, N, M = build_small_dataset()
 M = int(sys.argv[1])
 N = int(sys.argv[2])
+# R_true, N, M = build_small_dataset()
 D = int(min(M,N)/2) # number of latent factors
-U_true = build_Matrix(N, D)
-V_true = build_Matrix(M, D)
-R_true = build_toy_dataset(U_true, V_true)
+# U_true = build_Matrix(N, D)
+# V_true = build_Matrix(M, D)
+# R_true = build_toy_dataset(U_true, V_true)
+R_true = build_Matrix(N, M)
 R_true = np.array(R_true, dtype=np.float32)
 
 B = N
@@ -94,7 +95,7 @@ B = N
 # I_test = 1 - I_train
 
 # MODEL
-I = tf.placeholder(tf.float32, [N, M])
+# I = tf.placeholder(tf.float32, [N, M])
 # U = Gamma(alpha=tf.ones([N, M]), beta=tf.ones([N, M]))
 U = Gamma(alpha=tf.ones([N, D]), beta=tf.ones([N, D]))
 V = Gamma(alpha=tf.ones([M, D]), beta=tf.ones([M, D]))
