@@ -39,12 +39,12 @@ import pickle
 # pickle.dump( MapCustomerIdToIndex, open( "CustId_Index.p", "wb" ) )
 # pickle.dump( MapMovieIdToIndex, open( "MovieId_Index.p", "wb" ) )
 
-def getMiniBatch(i,B):
+def GetMiniBatch(i,B):
 	NumMovies = 17770
 	NumCust = 480189
 
 	X_batch = np.zeros((B, NumCust))
-	MapMovieIdToIndex = pickle.load( open( "MovieId_Index.p", "rb" ) )
+	# MapMovieIdToIndex = pickle.load( open( "MovieId_Index.p", "rb" ) )
 	MapCustomerIdToIndex = pickle.load( open( "CustId_Index.p", "rb" ) )
 
 	dirName = 'Netflix/training_set/'
@@ -69,3 +69,5 @@ def getMiniBatch(i,B):
 			line = fp.readline()
 		
 		j += 1
+
+	return X_batch
