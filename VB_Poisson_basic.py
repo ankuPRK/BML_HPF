@@ -4,7 +4,7 @@ import math
 import random
 import progressbar
 import edward as ed
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 from time import time
@@ -14,21 +14,22 @@ from edward.models import Gamma, Poisson, Normal
 from scipy.stats import poisson
 
 from scipy.special import digamma
+from scipy import special
 
-# def _sample_n(self, n=1, seed=None):
-#   # define Python function which returns samples as a Numpy array
-# 	np_sample = lambda lam, n: poisson.rvs(mu=lam, size=n, random_state=seed).astype(np.float32)
-#   # wrap python function as tensorflow op
-# 	val = tf.py_func(np_sample, [self.lam, n], [tf.float32])[0]
-#   # set shape from unknown shape
-# 	batch_event_shape = self.get_batch_shape().concatenate(self.get_event_shape())
-# 	shape = tf.concat(0, [tf.expand_dims(n, 0),
-# 					tf.constant(batch_event_shape.as_list(), 
-# 						dtype=tf.int32)])
-# 	# print batch_event_shape
-# 	# print shape
-# 	val = tf.reshape(val, shape)
-# 	return val
+def _sample_n(self, n=1, seed=None):
+  # define Python function which returns samples as a Numpy array
+	np_sample = lambda lam, n: poisson.rvs(mu=lam, size=n, random_state=seed).astype(np.float32)
+  # wrap python function as tensorflow op
+	val = tf.py_func(np_sample, [self.lam, n], [tf.float32])[0]
+  # set shape from unknown shape
+	batch_event_shape = self.get_batch_shape().concatenate(self.get_event_shape())
+	shape = tf.concat(0, [tf.expand_dims(n, 0),
+					tf.constant(batch_event_shape.as_list(), 
+						dtype=tf.int32)])
+	# print batch_event_shape
+	# print shape
+	val = tf.reshape(val, shape)
+	return val
 
 def build_toy_dataset(U, V):
   R = np.dot(U, V)
@@ -42,7 +43,7 @@ def get_indicators(N, M, prob_std=0.7):
 def build_Matrix(n1, n2):
 	X = np.zeros((n1,n2), dtype=np.int)	
 	for i in range(n1):
-		k = random.randint(0, int(n2/2))
+		k = random.randint(1, int(n2/2))
 		indices = random.sample(range(0, n2-1), k)
 		for index in indices:
 			X[i][index] = random.randint(1,5)
@@ -76,6 +77,17 @@ def build_small_dataset():
 		# U4	1	-	-	4
 		# U5	-	1	5	4	
 	X_train=np.array([5,3,0,1,4,0,0,1,1,1,0,5,1,0,0,4,0,1,5,4]).reshape((5,4))
+	# X_train = np.array([[0, 1, 5, 0, 4, 0, 0, 5, 3, 0, 0],
+	# 					 [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+	# 					 [0, 2, 1, 3, 0, 0, 0, 2, 0, 0, 0],
+	# 					 [0, 0, 5, 2, 0, 0, 0, 0, 0, 0, 0],
+	# 					 [0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0],
+	# 					 [4, 4, 0, 0, 4, 4, 0, 3, 0, 0, 0],
+	# 					 [0, 0, 0, 0, 0, 2, 1, 0, 0, 0, 0],
+	# 					 [5, 0, 0, 0, 0, 3, 0, 1, 4, 0, 0],
+	# 					 [0, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0],	
+	# 					 [0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0]]
+	# 					)
 		# 	D1	D2	D3	D4
 		# U1	4.97	2.98	2.18	0.98
 		# U2	3.97	2.40	1.97	0.99
@@ -83,7 +95,7 @@ def build_small_dataset():
 		# U4	1.00	0.85	4.59	3.93
 		# U5	1.36	1.07	4.89	4.12
 
-	return X_train, 5,4
+	return X_train, 5, 4
 
 if __name__ == '__main__':
 
@@ -99,7 +111,10 @@ if __name__ == '__main__':
 	# V_true = build_Matrix(K, D)
 
 	# DATA
-	X_train = build_Matrix(V, D)
+	U_true = build_Matrix(V, K)
+	V_true = build_Matrix(K, D)
+	X_train = build_toy_dataset(U_true, V_true)
+	# X_train = build_Matrix(V, D)
 	# X_train = np.zeros((V,D))
 	# X_train,V,D = build_small_dataset()
 	# K = int(min(V,D)/2)
@@ -114,10 +129,10 @@ if __name__ == '__main__':
 	a_v = np.random.rand(K, D)
 	b_v = np.random.rand(K, D)
 
-	au_0 = 0.1
-	bu_0 = 0.2
-	av_0 = 0.1
-	bv_0 = 0.2
+	au_0 = 1
+	bu_0 = 1
+	av_0 = 1
+	bv_0 = 1
 
 	# print a_u
 
@@ -134,13 +149,17 @@ if __name__ == '__main__':
 
 			for v in range(0, V):
 				p = 0
-				den = np.sum(np.exp(digamma(a_v[k,:]) - np.log(b_v[k,:])))
+				# den = np.sum(np.exp(digamma(a_v[k,:]) - np.log(b_v[k,:])))
+				den = np.sum(np.exp(special.psi(a_v[k,:]) - np.log(b_v[k,:])))
 				# den = np.sum(np.exp( digamma(a_v[k,:]) - np.log(b_v[k,:]) + (digamma(a_u[v][k]) - np.log(b_u[v][k]) )))
+				# den = np.sum(np.exp( special.psi(a_v[k,:]) - np.log(b_v[k,:]) + (special.psi(a_u[v][k]) - np.log(b_u[v][k]) )))
 				for d in ls_nz_V[v]:
-					p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d])) / den
-					# p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]) + digamma(a_u[v][k]) - np.log(b_u[v][k])) / den
+					# p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d])) / den
+					p += X_train[v][d]*math.exp(special.psi(a_v[k][d]) - np.log(b_v[k][d])) / den
+					# p += X_train[v][d]*(math.exp(special.psi(a_v[k][d]) - np.log(b_v[k][d]) + special.psi(a_u[v][k]) - np.log(b_u[v][k])) / den)
+					# p += X_train[v][d]*(math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]) + digamma(a_u[v][k]) - np.log(b_u[v][k])) / den)
 
-					# print p
+					# print sp
 				a_u[v][k] = au_0 + epsillon*p
 			b_u[:,k] = bu_0 + s
 
@@ -153,11 +172,15 @@ if __name__ == '__main__':
 				# a_v[k][d] += av_0
 			
 				p = 0
-				den = np.sum(np.exp(digamma(a_u[:,k]) - np.log(b_u[:,k])))
+				# den = np.sum(np.exp(digamma(a_u[:,k]) - np.log(b_u[:,k])))
+				den = np.sum(np.exp(special.psi(a_u[:,k]) - np.log(b_u[:,k])))
+				# den = np.sum(np.exp( special.psi(a_v[k][d]) - np.log(b_v[k][d]) + (special.psi(a_u[:,k]) - np.log(b_u[:,k]) )))		
 				# den = np.sum(np.exp( digamma(a_v[k][d]) - np.log(b_v[k][d]) + (digamma(a_u[:,k]) - np.log(b_u[:,k]) )))
 				for v in ls_nz_D[d]:	
-					p += X_train[v][d]*math.exp(digamma(a_u[v][k]) - np.log(b_u[v][k])) / den 
-					# p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]) + digamma(a_u[v][k]) - np.log(b_u[v][k])) / den
+					# p += X_train[v][d]*math.exp(digamma(a_u[v][k]) - np.log(b_u[v][k])) / den
+					p += X_train[v][d]*math.exp(special.psi(a_u[v][k]) - np.log(b_u[v][k])) / den 
+					# p += X_train[v][d]*(math.exp(special.psi(a_v[k][d]) - np.log(b_v[k][d]) + special.psi(a_u[v][k]) - np.log(b_u[v][k])) / den)
+					# p += X_train[v][d]*(math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]) + digamma(a_u[v][k]) - np.log(b_u[v][k])) / den)
 				
 				a_v[k][d] = av_0 + epsillon*p
 			b_v[k,:] = bv_0 + s
@@ -181,21 +204,17 @@ if __name__ == '__main__':
 	avg_U = np.zeros((V,K))
 	avg_V = np.zeros((K,D))
 
-	n_sample = 5000
-	for i in range(n_sample):
-		avg_U += qU_sample.eval()
-		avg_V += qV_sample.eval()
-
-	avg_U /= n_sample
-	avg_V /= n_sample
-
-	temp = np.dot(avg_U, avg_V)
+	n_sample = 10000
 	X_new = np.zeros((V,D))
 	for i in range(n_sample):
+		avg_U = qU_sample.eval()
+		avg_V = qV_sample.eval()
+		temp = np.dot(avg_U, avg_V)
 		X_new += np.random.poisson(temp)
 
 	print X_train
 	print np.round(X_new / n_sample, 0)
+
 
  	# X_train2 = np.array(X_train, dtype=np.float32)
 

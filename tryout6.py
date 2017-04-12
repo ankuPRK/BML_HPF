@@ -51,30 +51,86 @@ sess = ed.get_session()
 
 N = int(sys.argv[1])
 M = int(sys.argv[2])
-D = int(min(M,N)/2) # number of latent factors
+D = int(sys.argv[3])
+# D = int(min(M,N)/2) # number of latent factors
 
 U_t = build_Matrix(D, M)
 V_t = build_Matrix(N, D)
 X_train = build_toy_dataset(U_t, V_t)
 # X_train = build_Matrix(N, M)
 # X_train, N, M = build_small_dataset()
-print X_train
 
-pmf_var = pmf.PoissonMF(n_components=D, max_iter=10000, tol=0.0005,
-                 smoothness=100)
+
+# pmf_var = pmf.PoissonMF(n_components=D, max_iter=10000, tol=0.0005,
+#                  smoothness=100, verbose=False)
+
+# pmf_var.fit(X_train)
+# # print pmf_var.transform(X_train)
+
+# a_u = pmf_var.gamma_b
+# b_u = pmf_var.rho_b
+# b_u = np.repeat(b_u, M, axis=1)
+
+# # print a_u.shape
+# # # print a_u
+
+# # print b_u.shape
+# # # print b_u
+
+# a_v = pmf_var.gamma_t
+# b_v = pmf_var.rho_t
+# b_v = b_v.reshape((1, D))
+# b_v = np.repeat(b_v, N, axis=0)
+
+# # print a_v.shape
+# # print a_v
+
+# # print b_v.shape
+# # print b_v
+
+
+
+# qU = Gamma(alpha=a_u, beta=b_u)
+# qV = Gamma(alpha=a_v, beta=b_v)
+
+# qU_sample = qU.sample()
+# qV_sample = qV.sample()
+
+# print qU_sample.shape
+# print qV_sample.shape
+
+# # avg_U = np.zeros((D,M))
+# # avg_V = np.zeros((N,D))
+# X_new = np.zeros((N,M))
+# # X_new2 = np.zeros((N,M))
+
+# n_sample = 10000
+# for i in range(n_sample):
+# 	avg_U = qU_sample.eval()
+# 	avg_V = qV_sample.eval()
+# 	temp = np.dot(avg_V, avg_U)
+# 	X_new += np.random.poisson(temp)
+# 	# X_new2 += temp
+
+# # print X_new / n_sample
+# print np.round(X_new / n_sample, 0)
+
+
+pmf_var = pmf.OnlinePoissonMF(n_components=D,  batch_size=2, max_iter=1000, tol=0.0005,
+                 smoothness=100, verbose=False)
 
 pmf_var.fit(X_train)
 # print pmf_var.transform(X_train)
 
 a_u = pmf_var.gamma_b
 b_u = pmf_var.rho_b
-b_u = np.repeat(b_u, M, axis=1)
+# b_u = np.repeat(b_u, M, axis=1)
 
 print a_u.shape
-# # print a_u
+print a_u
 
-# print b_u.shape
-# # print b_u
+print b_u.shape
+print b_u
 
 a_v = pmf_var.gamma_t
 b_v = pmf_var.rho_t
@@ -82,10 +138,10 @@ b_v = b_v.reshape((1, D))
 b_v = np.repeat(b_v, N, axis=0)
 
 print a_v.shape
-# print a_v
+print a_v
 
-# print b_v.shape
-# print b_v
+print b_v.shape
+print b_v
 
 
 
@@ -111,7 +167,8 @@ for i in range(n_sample):
 	X_new += np.random.poisson(temp)
 	# X_new2 += temp
 
-print X_new / n_sample
+# print X_new / n_sample
+print X_train
 print np.round(X_new / n_sample, 0)
 # print np.round(X_new2 / n_sample, 0)
 # avg_U /= n_sample
