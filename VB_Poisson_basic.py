@@ -101,23 +101,26 @@ def FitUsingLibBatch(X_train, V, D, K):
 	b_v = b_v.reshape((1, K))
 	b_v = np.repeat(b_v, V, axis=0)
 
-	qU = Gamma(alpha=a_u, beta=b_u)
-	qV = Gamma(alpha=a_v, beta=b_v)
+	print a_v
+	# print b_v
+	# print a_v.shape
+	# qU = Gamma(alpha=a_u, beta=b_u)
+	# qV = Gamma(alpha=a_v, beta=b_v)
 
-	qU_sample = qU.sample()
-	qV_sample = qV.sample()
+	# qU_sample = qU.sample()
+	# qV_sample = qV.sample()
 
-	X_new = np.zeros((V,D))
+	# X_new = np.zeros((V,D))
 	
-	n_sample = 10000
-	for i in range(n_sample):
-		avg_U = qU_sample.eval()
-		avg_V = qV_sample.eval()
-		temp = np.dot(avg_V, avg_U)
-		X_new += np.random.poisson(temp)
+	# n_sample = 10000
+	# for i in range(n_sample):
+	# 	avg_U = qU_sample.eval()
+	# 	avg_V = qV_sample.eval()
+	# 	temp = np.dot(avg_V, avg_U)
+	# 	X_new += np.random.poisson(temp)
 		
-	# print X_train
-	print np.round(X_new / n_sample, 0)
+	# # print X_train
+	# print np.round(X_new / n_sample, 0)
 
 
 def FitUsingOwnImplementation(X_train, V, D, K):
@@ -143,18 +146,12 @@ def FitUsingOwnImplementation(X_train, V, D, K):
 	# curr = time()
 	for iteration in bar(range(5000)):
 		for k in range(0, K):
-			#s = 0
-			#for d in range(0, D):
-			# s = np.sum(a_v[k,:]/b_v[k,:])
-
+			
 			for v in range(0, V):
-				p = 0
-				den = np.sum(np.exp(Exp_Gamma_LogV[k,:]))
 				
-				for d in ls_nz_V[v]:
-					p += X_train[v][d]*math.exp(Exp_Gamma_LogV[k][d]) / den
-					
-				a_u[v][k] = au_0 + epsillon*p
+				den = np.sum(np.exp(Exp_Gamma_LogV[k,:]))				
+				a_u[v][k] = au_0 + np.sum(X_train[v,:] * np.exp(Exp_Gamma_LogV[k,:])) / den
+
 			b_u[:,k] = bu_0 + np.sum(Exp_Gamma_V[k,:])
 
 		Exp_Gamma_U, Exp_Gamma_LogU = ComputeExpectationGamma(a_u, b_u)
@@ -162,21 +159,16 @@ def FitUsingOwnImplementation(X_train, V, D, K):
 		for k in range(0, K):
 			
 			for d in range(0, D):
-				# a_v[k][d] += av_0
-			
-				p = 0
+				
 				den = np.sum(np.exp(Exp_Gamma_LogU[:,k]))
 			
-				for v in ls_nz_D[d]:
-					p += X_train[v][d]*math.exp(Exp_Gamma_LogU[v][k]) / den
-				
-				
-				a_v[k][d] = av_0 + epsillon*p
+				a_v[k][d] = av_0 + np.sum(X_train[:,d] * np.exp(Exp_Gamma_LogU[:,k])) / den
 			b_v[k,:] = bv_0 + np.sum(Exp_Gamma_U[:,k])
 
 		Exp_Gamma_V, Exp_Gamma_LogV = ComputeExpectationGamma(a_v, b_v)
 
-
+	print a_u
+	# print b_u
 	return a_u, b_u, a_v, b_v
 
 def ComputeExpectationGamma(alpha_mat, beta_mat):
@@ -204,24 +196,24 @@ if __name__ == '__main__':
 	FitUsingLibBatch(X_train, V, D, K)
 	
 	a_u, b_u, a_v, b_v = FitUsingOwnImplementation(X_train, V, D, K)
-	qU = Gamma(alpha=a_u, beta=b_u)
-	qV = Gamma(alpha=a_v, beta=b_v)
+	# qU = Gamma(alpha=a_u, beta=b_u)
+	# qV = Gamma(alpha=a_v, beta=b_v)
 
-	qU_sample = qU.sample()
-	qV_sample = qV.sample()
+	# qU_sample = qU.sample()
+	# qV_sample = qV.sample()
 
-	avg_U = np.zeros((V,K))
-	avg_V = np.zeros((K,D))
+	# avg_U = np.zeros((V,K))
+	# avg_V = np.zeros((K,D))
 
-	n_sample = 10000
-	X_new = np.zeros((V,D))
-	for i in range(n_sample):
-		avg_U = qU_sample.eval()
-		avg_V = qV_sample.eval()
-		temp = np.dot(avg_U, avg_V)
-		X_new += np.random.poisson(temp)
+	# n_sample = 10000
+	# X_new = np.zeros((V,D))
+	# for i in range(n_sample):
+	# 	avg_U = qU_sample.eval()
+	# 	avg_V = qV_sample.eval()
+	# 	temp = np.dot(avg_U, avg_V)
+	# 	X_new += np.random.poisson(temp)
 
 	
-	print np.round(X_new / n_sample, 0)
+	# print np.round(X_new / n_sample, 0)
 
 	
