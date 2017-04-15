@@ -16,20 +16,8 @@ from scipy.stats import poisson
 from scipy.special import digamma
 from scipy import special
 
-def _sample_n(self, n=1, seed=None):
-  # define Python function which returns samples as a Numpy array
-	np_sample = lambda lam, n: poisson.rvs(mu=lam, size=n, random_state=seed).astype(np.float32)
-  # wrap python function as tensorflow op
-	val = tf.py_func(np_sample, [self.lam, n], [tf.float32])[0]
-  # set shape from unknown shape
-	batch_event_shape = self.get_batch_shape().concatenate(self.get_event_shape())
-	shape = tf.concat(0, [tf.expand_dims(n, 0),
-					tf.constant(batch_event_shape.as_list(), 
-						dtype=tf.int32)])
-	# print batch_event_shape
-	# print shape
-	val = tf.reshape(val, shape)
-	return val
+import pmf
+
 
 def build_toy_dataset(U, V):
   R = np.dot(U, V)
@@ -97,6 +85,106 @@ def build_small_dataset():
 
 	return X_train, 5, 4
 
+
+def FitUsingLibBatch(X_train, V, D, K):
+	pmf_var = pmf.PoissonMF(n_components=K, max_iter=10000, tol=0.0005,
+	                 smoothness=100, verbose=False)
+
+	pmf_var.fit(X_train)
+
+	a_u = pmf_var.gamma_b
+	b_u = pmf_var.rho_b
+	b_u = np.repeat(b_u, D, axis=1)
+
+	a_v = pmf_var.gamma_t
+	b_v = pmf_var.rho_t
+	b_v = b_v.reshape((1, K))
+	b_v = np.repeat(b_v, V, axis=0)
+
+	qU = Gamma(alpha=a_u, beta=b_u)
+	qV = Gamma(alpha=a_v, beta=b_v)
+
+	qU_sample = qU.sample()
+	qV_sample = qV.sample()
+
+	X_new = np.zeros((V,D))
+	
+	n_sample = 10000
+	for i in range(n_sample):
+		avg_U = qU_sample.eval()
+		avg_V = qV_sample.eval()
+		temp = np.dot(avg_V, avg_U)
+		X_new += np.random.poisson(temp)
+		
+	# print X_train
+	print np.round(X_new / n_sample, 0)
+
+
+def FitUsingOwnImplementation(X_train, V, D, K):
+	epsillon = 1.0
+
+	a_u = np.random.rand(V, K)
+	b_u = np.random.rand(V, K)
+	a_v = np.random.rand(K, D)
+	b_v = np.random.rand(K, D)
+
+	Exp_Gamma_U, Exp_Gamma_LogU = ComputeExpectationGamma(a_u, b_u)
+	Exp_Gamma_V, Exp_Gamma_LogV = ComputeExpectationGamma(a_v, b_v)
+
+	au_0 = 1.0
+	bu_0 = 1.0
+	av_0 = 1.0
+	bv_0 = 1.0
+
+	ls_nz_V, ls_nz_D = get_list_of_nonzeros(X_train)
+	print("list is obtained. Starting iterations...")
+	bar = progressbar.ProgressBar()
+	iteration = 0
+	# curr = time()
+	for iteration in bar(range(5000)):
+		for k in range(0, K):
+			#s = 0
+			#for d in range(0, D):
+			# s = np.sum(a_v[k,:]/b_v[k,:])
+
+			for v in range(0, V):
+				p = 0
+				den = np.sum(np.exp(Exp_Gamma_LogV[k,:]))
+				
+				for d in ls_nz_V[v]:
+					p += X_train[v][d]*math.exp(Exp_Gamma_LogV[k][d]) / den
+					
+				a_u[v][k] = au_0 + epsillon*p
+			b_u[:,k] = bu_0 + np.sum(Exp_Gamma_V[k,:])
+
+		Exp_Gamma_U, Exp_Gamma_LogU = ComputeExpectationGamma(a_u, b_u)
+
+		for k in range(0, K):
+			
+			for d in range(0, D):
+				# a_v[k][d] += av_0
+			
+				p = 0
+				den = np.sum(np.exp(Exp_Gamma_LogU[:,k]))
+			
+				for v in ls_nz_D[d]:
+					p += X_train[v][d]*math.exp(Exp_Gamma_LogU[v][k]) / den
+				
+				
+				a_v[k][d] = av_0 + epsillon*p
+			b_v[k,:] = bv_0 + np.sum(Exp_Gamma_U[:,k])
+
+		Exp_Gamma_V, Exp_Gamma_LogV = ComputeExpectationGamma(a_v, b_v)
+
+
+	return a_u, b_u, a_v, b_v
+
+def ComputeExpectationGamma(alpha_mat, beta_mat):
+	return alpha_mat / beta_mat, (special.psi(alpha_mat) - np.log(beta_mat))
+
+
+
+
 if __name__ == '__main__':
 
 	sess = ed.get_session()
@@ -106,95 +194,16 @@ if __name__ == '__main__':
 	D = int(sys.argv[2])
 	K = int(sys.argv[3])  # number of latent factors
 
-	# # true latent factors
-	# U_true = build_Matrix(V, K)
-	# V_true = build_Matrix(K, D)
-
 	# DATA
 	U_true = build_Matrix(V, K)
 	V_true = build_Matrix(K, D)
 	X_train = build_toy_dataset(U_true, V_true)
-	# X_train = build_Matrix(V, D)
-	# X_train = np.zeros((V,D))
-	# X_train,V,D = build_small_dataset()
-	# K = int(min(V,D)/2)
-	# print X_train
-	# I_train = get_indicators(N, M)
-	# I_test = 1 - I_train
 
-	epsillon = 1.0
+	print X_train
 
-	a_u = np.random.rand(V, K)
-	b_u = np.random.rand(V, K)
-	a_v = np.random.rand(K, D)
-	b_v = np.random.rand(K, D)
-
-	au_0 = 1
-	bu_0 = 1
-	av_0 = 1
-	bv_0 = 1
-
-	# print a_u
-
-	ls_nz_V, ls_nz_D = get_list_of_nonzeros(X_train)
-	print("list is obtained. Starting iterations...")
-	bar = progressbar.ProgressBar()
-	iteration = 0
-	curr = time()
-	for iteration in bar(range(5000)):
-		for k in range(0, K):
-			#s = 0
-			#for d in range(0, D):
-			s = np.sum(a_v[k,:]/b_v[k,:])
-
-			for v in range(0, V):
-				p = 0
-				# den = np.sum(np.exp(digamma(a_v[k,:]) - np.log(b_v[k,:])))
-				den = np.sum(np.exp(special.psi(a_v[k,:]) - np.log(b_v[k,:])))
-				# den = np.sum(np.exp( digamma(a_v[k,:]) - np.log(b_v[k,:]) + (digamma(a_u[v][k]) - np.log(b_u[v][k]) )))
-				# den = np.sum(np.exp( special.psi(a_v[k,:]) - np.log(b_v[k,:]) + (special.psi(a_u[v][k]) - np.log(b_u[v][k]) )))
-				for d in ls_nz_V[v]:
-					# p += X_train[v][d]*math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d])) / den
-					p += X_train[v][d]*math.exp(special.psi(a_v[k][d]) - np.log(b_v[k][d])) / den
-					# p += X_train[v][d]*(math.exp(special.psi(a_v[k][d]) - np.log(b_v[k][d]) + special.psi(a_u[v][k]) - np.log(b_u[v][k])) / den)
-					# p += X_train[v][d]*(math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]) + digamma(a_u[v][k]) - np.log(b_u[v][k])) / den)
-
-					# print sp
-				a_u[v][k] = au_0 + epsillon*p
-			b_u[:,k] = bu_0 + s
-
-		for k in range(0, K):
-			# s = 0
-			# for v in range(0, V):
-			s = np.sum(a_u[:,k]/b_u[:,k])
-
-			for d in range(0, D):
-				# a_v[k][d] += av_0
-			
-				p = 0
-				# den = np.sum(np.exp(digamma(a_u[:,k]) - np.log(b_u[:,k])))
-				den = np.sum(np.exp(special.psi(a_u[:,k]) - np.log(b_u[:,k])))
-				# den = np.sum(np.exp( special.psi(a_v[k][d]) - np.log(b_v[k][d]) + (special.psi(a_u[:,k]) - np.log(b_u[:,k]) )))		
-				# den = np.sum(np.exp( digamma(a_v[k][d]) - np.log(b_v[k][d]) + (digamma(a_u[:,k]) - np.log(b_u[:,k]) )))
-				for v in ls_nz_D[d]:	
-					# p += X_train[v][d]*math.exp(digamma(a_u[v][k]) - np.log(b_u[v][k])) / den
-					p += X_train[v][d]*math.exp(special.psi(a_u[v][k]) - np.log(b_u[v][k])) / den 
-					# p += X_train[v][d]*(math.exp(special.psi(a_v[k][d]) - np.log(b_v[k][d]) + special.psi(a_u[v][k]) - np.log(b_u[v][k])) / den)
-					# p += X_train[v][d]*(math.exp(digamma(a_v[k][d]) - np.log(b_v[k][d]) + digamma(a_u[v][k]) - np.log(b_u[v][k])) / den)
-				
-				a_v[k][d] = av_0 + epsillon*p
-			b_v[k,:] = bv_0 + s
-		prev = curr
-		curr = time()
-#		print("Iteration " + str(iteration) + ": time taken(in s): " + str(curr-prev))
-	# print a_u
-	# print b_u
-
-
-#max vals:
-	# u_s = (a_u - 1.0) / b_u
-	# v_s = (a_v - 1.0) / b_v
-	# temp = np.dot(u_s,v_s)
+	FitUsingLibBatch(X_train, V, D, K)
+	
+	a_u, b_u, a_v, b_v = FitUsingOwnImplementation(X_train, V, D, K)
 	qU = Gamma(alpha=a_u, beta=b_u)
 	qV = Gamma(alpha=a_v, beta=b_v)
 
@@ -212,28 +221,7 @@ if __name__ == '__main__':
 		temp = np.dot(avg_U, avg_V)
 		X_new += np.random.poisson(temp)
 
-	print X_train
+	
 	print np.round(X_new / n_sample, 0)
 
-
- 	# X_train2 = np.array(X_train, dtype=np.float32)
-
-	# qX = Poisson(lam=temp, value=tf.zeros_like(temp))
-	# qX = tf.reshape(qX, [V, D])
-	# qX = tf.cast(qX, tf.float32)
-
-	# # print("Mean squared error on test data:")
-	# print(ed.evaluate('mean_squared_error', data={qX: X_train2}))
-	# # print(ed.evaluate('log_likelihood'))
-
-	# qX = Poisson(lam=temp)
-	# qX = tf.reshape(qX, [V, D])
-	# qX = tf.cast(qX, tf.float32)
-
-	# # print("Mean squared error on test data:")
-	# print(ed.evaluate('mean_squared_error', data={qX: X_train2}))
-	# # print(ed.evaluate('log_likelihood'))
-
-	# # X_new = np.random.poisson(temp)
-	# print X_train
-	# print X_new
+	
