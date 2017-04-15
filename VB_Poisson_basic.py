@@ -104,32 +104,32 @@ def FitUsingLibBatch(X_train, V, D, K):
 	print a_v
 	# print b_v
 	# print a_v.shape
-	# qU = Gamma(alpha=a_u, beta=b_u)
-	# qV = Gamma(alpha=a_v, beta=b_v)
+	qU = Gamma(alpha=a_u, beta=b_u)
+	qV = Gamma(alpha=a_v, beta=b_v)
 
-	# qU_sample = qU.sample()
-	# qV_sample = qV.sample()
+	qU_sample = qU.sample()
+	qV_sample = qV.sample()
 
-	# X_new = np.zeros((V,D))
+	X_new = np.zeros((V,D))
 	
-	# n_sample = 10000
-	# for i in range(n_sample):
-	# 	avg_U = qU_sample.eval()
-	# 	avg_V = qV_sample.eval()
-	# 	temp = np.dot(avg_V, avg_U)
-	# 	X_new += np.random.poisson(temp)
+	n_sample = 10000
+	for i in range(n_sample):
+		avg_U = qU_sample.eval()
+		avg_V = qV_sample.eval()
+		temp = np.dot(avg_V, avg_U)
+		X_new += np.random.poisson(temp)
 		
-	# # print X_train
+	# print X_train
 	# print np.round(X_new / n_sample, 0)
 
 
 def FitUsingOwnImplementation(X_train, V, D, K):
 	epsillon = 1.0
 
-	a_u = np.random.rand(V, K)
-	b_u = np.random.rand(V, K)
-	a_v = np.random.rand(K, D)
-	b_v = np.random.rand(K, D)
+	a_u = np.random.rand(V, K) + 0.2
+	b_u = np.random.rand(V, K) + 0.2
+	a_v = np.random.rand(K, D) + 0.2
+	b_v = np.random.rand(K, D) + 0.2
 
 	Exp_Gamma_U, Exp_Gamma_LogU = ComputeExpectationGamma(a_u, b_u)
 	Exp_Gamma_V, Exp_Gamma_LogV = ComputeExpectationGamma(a_v, b_v)
@@ -144,26 +144,57 @@ def FitUsingOwnImplementation(X_train, V, D, K):
 	bar = progressbar.ProgressBar()
 	iteration = 0
 	# curr = time()
-	for iteration in bar(range(5000)):
+	for iteration in bar(range(10000)):
 		for k in range(0, K):
-			
+			temp = np.exp(Exp_Gamma_LogV[k,:])
+			den = np.sum(temp)
 			for v in range(0, V):
 				
-				den = np.sum(np.exp(Exp_Gamma_LogV[k,:]))				
-				a_u[v][k] = au_0 + np.sum(X_train[v,:] * np.exp(Exp_Gamma_LogV[k,:])) / den
+				# den = np.sum(np.exp(special.psi(a_v[k,:]) - np.log(b_v[k,:])))				
+				# a_u[v][k] = au_0 + np.sum(X_train[v,:] * np.exp(special.psi(a_v[k,:]) - np.log(b_v[k,:]))) / den
+				# print math.exp(Exp_Gamma_LogU[v][k])
+				if math.isnan(math.exp(Exp_Gamma_LogU[v][k])):
+					print "nan1"
+					print iteration
+					print Exp_Gamma_LogU[v][k]
+					sys.exit()
+
+
+				a_u[v][k] = au_0 + (np.sum(X_train[v,:] * temp) / den)
+				if a_u[v][k] == 0 or not np.isfinite(a_u[v][k]):
+					print "N2"
+
 
 			b_u[:,k] = bu_0 + np.sum(Exp_Gamma_V[k,:])
+			# b_u[:,k] = bu_0 + np.sum(a_v[k,:]/b_v[k,:])
 
+		# bu = bu_0 + np.sum(Exp_Gamma_V, axis=0, keepdims=True)
+			
 		Exp_Gamma_U, Exp_Gamma_LogU = ComputeExpectationGamma(a_u, b_u)
 
 		for k in range(0, K):
 			
+			temp = np.exp(Exp_Gamma_LogU[:,k])
+			den = np.sum(temp)
 			for d in range(0, D):
-				
-				den = np.sum(np.exp(Exp_Gamma_LogU[:,k]))
+				# den = np.sum(np.exp(special.psi(a_u[:,k]) - np.log(b_u[:,k])))
 			
-				a_v[k][d] = av_0 + np.sum(X_train[:,d] * np.exp(Exp_Gamma_LogU[:,k])) / den
+				# a_v[k][d] = av_0 + np.sum(X_train[:,d] * np.exp(special.psi(a_u[:,k]) - np.log(b_u[:,k]))) / den
+				# print math.exp(Exp_Gamma_LogV[k][d])
+				if math.isnan(math.exp(Exp_Gamma_LogV[k][d])):
+					print "nan2"
+					print iteration
+					print Exp_Gamma_LogV[k][d]
+					sys.exit()
+
+				a_v[k][d] = av_0 + (np.sum(X_train[:,d] * temp) / den)
+				if a_v[k][d] == 0 or not np.isfinite(a_v[k][d]):
+					print "N2"
+
+			# b_v[k,:] = bv_0 + np.sum(a_u[:,k]/b_u[:,k])
 			b_v[k,:] = bv_0 + np.sum(Exp_Gamma_U[:,k])
+
+		# b_v = bv_0 + np.sum(Exp_Gamma_U, axis=1)
 
 		Exp_Gamma_V, Exp_Gamma_LogV = ComputeExpectationGamma(a_v, b_v)
 
@@ -172,6 +203,15 @@ def FitUsingOwnImplementation(X_train, V, D, K):
 	return a_u, b_u, a_v, b_v
 
 def ComputeExpectationGamma(alpha_mat, beta_mat):
+	# a = np.nonzero(alpha_mat)
+	# a = a[0].shape[0]
+	# if a != 15:
+	# 	print "NOk1"
+
+	# b = np.nonzero(beta_mat)
+	# b = b[0].shape[0]
+	# if b != 12:
+	# 	print "NOk2"
 	return alpha_mat / beta_mat, (special.psi(alpha_mat) - np.log(beta_mat))
 
 
@@ -196,22 +236,22 @@ if __name__ == '__main__':
 	FitUsingLibBatch(X_train, V, D, K)
 	
 	a_u, b_u, a_v, b_v = FitUsingOwnImplementation(X_train, V, D, K)
-	# qU = Gamma(alpha=a_u, beta=b_u)
-	# qV = Gamma(alpha=a_v, beta=b_v)
+	qU = Gamma(alpha=a_u, beta=b_u)
+	qV = Gamma(alpha=a_v, beta=b_v)
 
-	# qU_sample = qU.sample()
-	# qV_sample = qV.sample()
+	qU_sample = qU.sample()
+	qV_sample = qV.sample()
 
-	# avg_U = np.zeros((V,K))
-	# avg_V = np.zeros((K,D))
+	avg_U = np.zeros((V,K))
+	avg_V = np.zeros((K,D))
 
-	# n_sample = 10000
-	# X_new = np.zeros((V,D))
-	# for i in range(n_sample):
-	# 	avg_U = qU_sample.eval()
-	# 	avg_V = qV_sample.eval()
-	# 	temp = np.dot(avg_U, avg_V)
-	# 	X_new += np.random.poisson(temp)
+	n_sample = 10000
+	X_new = np.zeros((V,D))
+	for i in range(n_sample):
+		avg_U = qU_sample.eval()
+		avg_V = qV_sample.eval()
+		temp = np.dot(avg_U, avg_V)
+		X_new += np.random.poisson(temp)
 
 	
 	# print np.round(X_new / n_sample, 0)
