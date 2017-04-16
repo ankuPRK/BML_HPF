@@ -59,7 +59,7 @@ def Create_Data_Set(max_customer, max_movie):
 	Save_Training_Data = "Netflix_train"
 
 	indexMovie = 0
-	bar = progressbar.ProgressBar()
+	# bar = progressbar.ProgressBar()
 	with progressbar.ProgressBar(max_value=2000) as bar:
 		for filename in filenames:	
 			fp = open(dirName + filename)
@@ -70,7 +70,8 @@ def Create_Data_Set(max_customer, max_movie):
 				continue
 
 			indexMovie += 1
-			bar.update(indexMovie)
+			sys.stdout.write("Creating Mapping progress: %d   \r" % (indexMovie))
+			sys.stdout.flush()
 
 			if indexMovie >= max_movie:
 				break
