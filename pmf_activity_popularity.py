@@ -65,6 +65,16 @@ class PoissonMF(BaseEstimator, TransformerMixin):
         self.a = float(kwargs.get('a', 0.1))
         self.b = float(kwargs.get('b', 0.1))
 
+    def _init_popularity(self, n_feats):
+        # variational parameters for beta
+        self.gamma_p = self.smoothness \
+            * np.random.gamma(self.smoothness, 1. / self.smoothness,
+                              size=(1, n_feats))
+        self.rho_p = self.smoothness \
+            * np.random.gamma(self.smoothness, 1. / self.smoothness,
+                              size=(1, n_feats))
+        self.Ep, self.Elogp = _compute_expectations(self.gamma_p, self.rho_p)
+
     def _init_components(self, n_feats):
         # variational parameters for beta
         self.gamma_b = self.smoothness \
@@ -95,6 +105,17 @@ class PoissonMF(BaseEstimator, TransformerMixin):
         self.gamma_b, self.rho_b = shape, rate
         self.Eb, self.Elogb = _compute_expectations(self.gamma_b, self.rho_b)
         return self
+
+    def _init_activity(self, n_samples):
+        # variational parameters for theta
+        self.gamma_a = self.smoothness \
+            * np.random.gamma(self.smoothness, 1. / self.smoothness,
+                              size=(n_samples, 1))
+        self.rho_a = self.smoothness \
+            * np.random.gamma(self.smoothness, 1. / self.smoothness,
+                              size=(n_samples, 1))
+        self.Ea, self.Eloga = _compute_expectations(self.gamma_a, self.rho_a)
+        # self.c = 1. / np.mean(self.Et)
 
     def _init_weights(self, n_samples):
         # variational parameters for theta
@@ -300,8 +321,14 @@ class OnlinePoissonMF(PoissonMF):
             self._scale = float(n_samples) / self.batch_size
         else:
             self._scale = float(est_total) / self.batch_size
+        self._init_popularity(n_feats)
         self._init_components(n_feats)
+        self._init_activity(n_samples)
         self._init_weights(n_samples)
+        
+        #Update Activity and Popularity shape parameter
+        self.gamma_p = self.c_prime + self.n_components*self.c
+
         self.bound = list()
         for count in xrange(self.n_pass):
             if self.verbose:
@@ -337,12 +364,16 @@ class OnlinePoissonMF(PoissonMF):
         # take a (natural) gradient step
         ratio = X / self._xexplog(istart, iend)
         self.gamma_b = (1 - self.rho) * self.gamma_b + self.rho * \
-            (self.b + self._scale * np.exp(self.Elogb) *
+            (self.c + self._scale * np.exp(self.Elogb) *
              np.dot(np.exp(self.Elogt[istart:iend]).T, ratio))
         #print self.b, self._scale * np.sum(self.Et, axis=0, keepdims=True).T
         self.rho_b = (1 - self.rho) * self.rho_b + self.rho * \
-            (self.b + self._scale * np.sum(self.Et[istart:iend], axis=0, keepdims=True).T)
+            (self.Ep + self._scale * np.sum(self.Et[istart:iend], axis=0, keepdims=True).T)
         self.Eb, self.Elogb = _compute_expectations(self.gamma_b, self.rho_b)
+
+        self.rho_p = (1.0*self.c_prime / self.d_prime) + np.sum(self.Eb, axis=0, keepdims=True).T
+
+        self.Ep, self.Elogp = _compute_expectations(self.gamma_p, self.rho_p)
 
         return self
 
@@ -380,6 +411,7 @@ class OnlinePoissonMF(PoissonMF):
         old_bd = -np.inf
         for i in xrange(self.max_iter):
             self._update_theta(X, istart, iend)
+            self._update_zai(X, istart, iend)
             bound = self._bound(X, istart, iend)
             improvement = (bound - old_bd) / abs(old_bd)
             if self.verbose:
@@ -438,11 +470,19 @@ class OnlinePoissonMF(PoissonMF):
 
     def _update_theta(self, X, istart, iend):
         ratio = X / self._xexplog(istart, iend)
-        self.gamma_t[istart:iend] = self.a + np.exp(self.Elogt[istart:iend]) * np.dot(
-            ratio, np.exp(self.Elogb).T)
-        self.rho_t[istart:iend] = self.a * self.c + np.sum(self.Eb, axis=1)
+        self.gamma_t[istart:iend] = self.a + np.exp(self.Elogt[istart:iend]) * np.dot(ratio, np.exp(self.Elogb).T)
+        # self.rho_t[istart:iend] = self.a * self.c + np.sum(self.Eb, axis=1)
+        self.rho_t[istart:iend] = self.Ea * self.c + np.sum(self.Eb, axis=1)
         self.Et[istart:iend], self.Elogt[istart:iend] = _compute_expectations(self.gamma_t[istart:iend], self.rho_t[istart:iend])
         self.c = 1. / np.mean(self.Et[istart:iend])
+
+    def _update_zai(self, X, istart, iend):
+        ratio = X / self._xexplog(istart, iend)
+        self.gamma_a[istart:iend] = self.a_prime + self.n_components*self.a
+        # self.rho_t[istart:iend] = self.a * self.c + np.sum(self.Eb, axis=1)
+        self.rho_a[istart:iend] = (1.0*self.a_prime / self.b_prime) + np.sum(self.Et, axis=1)
+        self.Ea[istart:iend], self.Eloga[istart:iend] = _compute_expectations(self.gamma_a[istart:iend], self.rho_a[istart:iend])
+        # self.c = 1. / np.mean(self.Et[istart:iend])
 
     def _bound(self, X, istart, iend):
         bound = np.sum(X * np.log(self._xexplog(istart, iend)) - self.Et[istart:iend].dot(self.Eb))
