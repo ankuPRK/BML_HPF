@@ -51,16 +51,18 @@ def build_small_dataset():
 sess = ed.get_session()
 
 
-Num_Movies = 2000
-Num_Customer = 30000
-Latent_Factors = 100
+Num_Movies = 1000
+Num_Customer = 10000
+Latent_Factors = 900
 
 # Create_Mapping_Customer(Num_Customer, Num_Movies)
 # Create_Data_Set(Num_Customer, Num_Movies)
 Training_Data = "Netflix_train.npy"
 X_train = np.load(Training_Data)
+X_train = X_train[0:Num_Customer]
+X_train = X_train[:,0:Num_Movies]
 
-pmf_var = pmf_modified.OnlinePoissonMF(n_components=Latent_Factors, batch_size=10, n_pass=2,max_iter=10, tol=0.0005, smoothness=100, verbose=True)
+pmf_var = pmf_modified.OnlinePoissonMF(n_components=Latent_Factors, batch_size=10, n_pass=10, max_iter=20, tol=0.0005, smoothness=100, verbose=True)
 
 # pmf_var.fit_Netflix(Num_Customer, Num_Movies)
 pmf_var.fit(X_train)
@@ -79,7 +81,7 @@ qV_sample = qV.sample()
 
 X_new = np.zeros((Num_Customer,Num_Movies))
 
-n_sample = 10
+n_sample = 1000
 for i in range(n_sample):
 	avg_U = qU_sample.eval()
 	avg_V = qV_sample.eval()
@@ -102,12 +104,24 @@ rmse = math.sqrt(1.0*rmse / tot)
 print rmse
 
 
+
+
+
+
+
+
 # print X_new / n_sample
 # print X_train
 # print np.round(X_new / n_sample, 1)
 
-# pmf_var = pmf_modified.OnlinePoissonMF(n_components=D,  batch_size=2, max_iter=1000, tol=0.0005,
-#                  smoothness=100, verbose=False)
+# X_train, N, M = build_small_dataset()
+# N = 10
+# M = 8
+# D = 6
+# U = build_Matrix(D, M)
+# V = build_Matrix(N, D)
+# X_train = np.dot(V, U)
+# pmf_var = pmf_modified.OnlinePoissonMF(n_components=D,  batch_size=2, max_iter=1000, tol=0.0005,  smoothness=100, verbose=True, n_pass=20)
 
 # pmf_var.fit(X_train)
 # # print pmf_var.transform(X_train)
@@ -126,12 +140,27 @@ print rmse
 
 # X_new = np.zeros((N,M))
 
-# n_sample = 10000
+# n_sample = 1000
 # for i in range(n_sample):
 # 	avg_U = qU_sample.eval()
 # 	avg_V = qV_sample.eval()
 # 	temp = np.dot(avg_V, avg_U)
 # 	X_new += np.random.poisson(temp)
-	
-# # print X_train
-# print np.round(X_new / n_sample, 0)
+# 	# X_new2 += temp
+
+# X_new = np.round(X_new / n_sample, 1)
+# print X_train
+# print X_new
+
+# rmse = 0
+# tot = 0
+# for i in range(N):
+# 	for j in range(M):
+# 		if X_train[i][j] == 0:
+# 			continue
+# 		rmse += (X_train[i][j] - X_new[i][j])*2
+# 		tot += 1
+
+# print tot
+# rmse = math.sqrt(1.0*rmse / tot)
+# print rmse
