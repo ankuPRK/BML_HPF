@@ -4,6 +4,7 @@ from __future__ import division
 
 import os
 import sys
+import math
 import random
 import edward as ed
 # import matplotlib.pyplot as plt
@@ -54,38 +55,56 @@ Num_Movies = 2000
 Num_Customer = 30000
 Latent_Factors = 100
 
-Create_Mapping_Customer(Num_Customer, Num_Movies)
-Create_Data_Set(Num_Customer, Num_Movies)
-# pmf_var = pmf_modified.OnlinePoissonMF(n_components=D, batch_size=1, n_pass=4,max_iter=10, tol=0.0005, smoothness=100, verbose=True)
+# Create_Mapping_Customer(Num_Customer, Num_Movies)
+# Create_Data_Set(Num_Customer, Num_Movies)
+Training_Data = "Netflix_train.npy"
+X_train = np.load(Training_Data)
 
-# pmf_var.fit_Netflix(N, M)
-# pmf_var.fit(X_train)
+pmf_var = pmf_modified.OnlinePoissonMF(n_components=Latent_Factors, batch_size=10, n_pass=2,max_iter=10, tol=0.0005, smoothness=100, verbose=True)
 
-# a_u = pmf_var.gamma_b
-# b_u = pmf_var.rho_b
+# pmf_var.fit_Netflix(Num_Customer, Num_Movies)
+pmf_var.fit(X_train)
 
-# a_v = pmf_var.gamma_t
-# b_v = pmf_var.rho_t
+a_u = pmf_var.gamma_b
+b_u = pmf_var.rho_b
 
-# qU = Gamma(alpha=a_u, beta=b_u)
-# qV = Gamma(alpha=a_v, beta=b_v)
+a_v = pmf_var.gamma_t
+b_v = pmf_var.rho_t
 
-# qU_sample = qU.sample()
-# qV_sample = qV.sample()
+qU = Gamma(alpha=a_u, beta=b_u)
+qV = Gamma(alpha=a_v, beta=b_v)
 
-# X_new = np.zeros((N,M))
+qU_sample = qU.sample()
+qV_sample = qV.sample()
 
-# n_sample = 10000
-# for i in range(n_sample):
-# 	avg_U = qU_sample.eval()
-# 	avg_V = qV_sample.eval()
-# 	temp = np.dot(avg_V, avg_U)
-# 	X_new += np.random.poisson(temp)
-# 	# X_new2 += temp
+X_new = np.zeros((Num_Customer,Num_Movies))
 
-# # print X_new / n_sample
+n_sample = 10
+for i in range(n_sample):
+	avg_U = qU_sample.eval()
+	avg_V = qV_sample.eval()
+	temp = np.dot(avg_V, avg_U)
+	X_new += np.random.poisson(temp)
+	# X_new2 += temp
+
+X_new = np.round(X_new / n_sample, 1)
+
+rmse = 0
+tot = 0
+for i in range(Num_Customer):
+	for j in range(Num_Movies):
+		if X_train[i][j] == 0:
+			continue
+		rmse += (X_train[i][j] - X_new[i][j])**2
+		tot += 1
+
+rmse = math.sqrt(1.0*rmse / tot)
+print rmse
+
+
+# print X_new / n_sample
 # print X_train
-# print np.round(X_new / n_sample, 0)
+# print np.round(X_new / n_sample, 1)
 
 # pmf_var = pmf_modified.OnlinePoissonMF(n_components=D,  batch_size=2, max_iter=1000, tol=0.0005,
 #                  smoothness=100, verbose=False)

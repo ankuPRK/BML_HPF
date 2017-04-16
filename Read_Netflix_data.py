@@ -44,7 +44,7 @@ def Create_Mapping_Customer(max_customer, max_movie):
 	print indexMovie
 	print indexCustomer
 	pickle.dump( MapCustomerIdToIndex, open( "CustId_Index.p", "wb" ) )
-	pickle.dump( MapCustomerIdToIndex, open( "MovieId_Index.p", "wb" ) )
+	pickle.dump( MapMovieIdToIndex, open( "MovieId_Index.p", "wb" ) )
 	
 
 
@@ -60,42 +60,49 @@ def Create_Data_Set(max_customer, max_movie):
 
 	indexMovie = 0
 	# bar = progressbar.ProgressBar()
-	with progressbar.ProgressBar(max_value=2000) as bar:
-		for filename in filenames:	
-			fp = open(dirName + filename)
-			line = fp.readline()
+	# with progressbar.ProgressBar(max_value=2000) as bar:
+	for filename in filenames:			
+		fp = open(dirName + filename)
+		line = fp.readline()
 
-			MovieId = int(line.strip(':\n'))
-			if MovieId not in MapMovieIdToIndex:
+		MovieId = int(line.strip(':\n'))
+		if MovieId not in MapMovieIdToIndex:
+			continue
+
+		col_no = MapMovieIdToIndex[MovieId]
+
+		indexMovie += 1
+		sys.stdout.write("Percentage of files: %d   \r" % (1.0*indexMovie/20))
+		sys.stdout.flush()
+
+		if indexMovie >= max_movie:
+			break
+
+		k = 0
+	
+		line = fp.readline()
+		while line:
+			row = line.strip('\n')
+			CustId_Rating = row.split(',')
+			CustId = int(CustId_Rating[0])
+			Rating = int(CustId_Rating[1])
+			
+			if CustId not in MapCustomerIdToIndex:
+				line = fp.readline()
 				continue
 
-			indexMovie += 1
-			sys.stdout.write("Creating Mapping progress: %d   \r" % (indexMovie))
-			sys.stdout.flush()
+			row_no = MapCustomerIdToIndex[CustId]			
+			X_train[row_no][col_no] = Rating			
 
-			if indexMovie >= max_movie:
-				break
-
+			k += 1
 			line = fp.readline()
-			while line:
-				row = line.strip('\n')
-				CustId_Rating = row.split(',')
-				CustId = int(CustId_Rating[0])
-				Rating = int(CustId_Rating[1])
-				
-				if CustId not in MapCustomerIdToIndex:
-					continue
+			# sys.stdout.write("File progress: %d   \r" % (k))
+			# sys.stdout.flush()
 
-				row_no = MapCustomerIdToIndex[CustId]
-				col_no = MapMovieIdToIndex[MovieId]
-				X_train[row_no][col_no] = Rating
-					
 
-				line = fp.readline()
-
-		print X_train[0]
-		print X_train[1]
-		np.save(Save_Training_Data, X_train)
+	print X_train[0]
+	print X_train[1]
+	np.save(Save_Training_Data, X_train)
 
 
 # def GetMiniBatch(i,B):
