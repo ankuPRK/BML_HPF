@@ -269,10 +269,14 @@ class OnlinePoissonMF(PoissonMF):
         self._parse_args(**kwargs)
 
     def _parse_args(self, **kwargs):
+        self.a_prime = float(kwargs.get('a_prime', 0.1))
+        self.b_prime = float(kwargs.get('b_prime', 0.1))
         self.a = float(kwargs.get('a', 0.1))
-        self.b = float(kwargs.get('b', 0.1))
+        self.c_prime = float(kwargs.get('c_prime', 0.1))
+        self.d_prime = float(kwargs.get('d_prime', 0.1))
+        self.c = float(kwargs.get('c', 0.1))
         self.t0 = float(kwargs.get('t0', 1.))
-        self.kappa = float(kwargs.get('kappa', 0.6))
+        self.rho = float(kwargs.get('rho', 0.6))
 
     def fit(self, X, est_total=None):
         '''Fit the model to the data in X. X has to be loaded into memory.
@@ -411,7 +415,7 @@ class OnlinePoissonMF(PoissonMF):
         if rho is not None:
             self.rho = rho
         elif iter is not None:
-            self.rho = (iter + self.t0)**(-self.kappa)
+            self.rho = (iter + self.t0)**(-self.rho)
         else:
             raise ValueError('invalid learning rate.')
         return self
