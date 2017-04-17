@@ -63,7 +63,7 @@ class PoissonMF(BaseEstimator, TransformerMixin):
 
     def _parse_args(self, **kwargs):
         self.a = float(kwargs.get('a', 0.1))
-        self.c = float(kwargs.get('b', 0.1))
+        self.c = float(kwargs.get('c', 0.1))
 
     def _init_popularity(self, n_feats):
         # variational parameters for beta
@@ -126,7 +126,7 @@ class PoissonMF(BaseEstimator, TransformerMixin):
             * np.random.gamma(self.smoothness, 1. / self.smoothness,
                               size=(n_samples, self.n_components))
         self.Et, self.Elogt = _compute_expectations(self.gamma_t, self.rho_t)
-        self.c = 1. / np.mean(self.Et)
+        # self.c = 1. / np.mean(self.Et)
 
     def fit(self, X):
         '''Fit the model to the data in X.
@@ -327,7 +327,8 @@ class OnlinePoissonMF(PoissonMF):
         self._init_weights(n_samples)
         
         #Update Activity and Popularity shape parameter
-        self.gamma_p = self.c_prime + self.n_components*self.c
+        self.gamma_p = np.repeat(self.c_prime + self.n_components*self.c, n_feats).reshape((1, n_feats))
+        # self.gamma_p = self.c_prime + self.n_components*self.c
 
         self.cound = list()
         for count in xrange(self.n_pass):
@@ -367,12 +368,23 @@ class OnlinePoissonMF(PoissonMF):
             (self.c + self._scale * np.exp(self.Elogb) *
              np.dot(np.exp(self.Elogt[istart:iend]).T, ratio))
         #print self.c, self._scale * np.sum(self.Et, axis=0, keepdims=True).T
-        self.rho_b = (1 - self.rho) * self.rho_b + self.rho * \
-            (self.Ep + self._scale * np.sum(self.Et[istart:iend], axis=0, keepdims=True).T)
+        # print "Partial Fit"
+        # print self.rho_b.shape
+        # print self.Ep.shape
+        # print self._scale.shape
+        # print np.sum(self.Et[istart:iend], axis=0, keepdims=True).shape
+        # print self.gamma_p.shape
+        # print self.rho_p.shape
+        temp = (1 - self.rho) * self.rho_b.T + self.rho * \
+            (self.Ep.T + self._scale * np.sum(self.Et[istart:iend].T, axis=1, keepdims=False))
+        self.rho_b = temp.T
         self.Eb, self.Elogb = _compute_expectations(self.gamma_b, self.rho_b)
+        # print self.rho_p.shape
+        # print np.sum(self.Eb, axis=0, keepdims=True).T.shape
+        self.rho_p = (1 - self.rho)*self.rho_p + self.rho*((1.0*self.c_prime / self.d_prime) + np.sum(self.Eb, axis=0, keepdims=True))
 
-        self.rho_p = (1.0*self.c_prime / self.d_prime) + np.sum(self.Eb, axis=0, keepdims=True).T
-
+        # print self.gamma_p.shape
+        # print self.rho_p.shape
         self.Ep, self.Elogp = _compute_expectations(self.gamma_p, self.rho_p)
 
         return self
@@ -398,7 +410,7 @@ class OnlinePoissonMF(PoissonMF):
             raise ValueError('There are no pre-trained components.')
         n_samples, n_feats = X.shape
         self.Et[istart:iend], self.Elogt[istart:iend] = _compute_expectations(self.gamma_t[istart:iend], self.rho_t[istart:iend])
-        self.c = 1. / np.mean(self.Et[istart:iend])
+        # self.c = 1. / np.mean(self.Et[istart:iend])
         if n_feats != self.Eb.shape[1]:
             raise ValueError('The dimension of the transformed data '
                              'does not match with the existing components.')
@@ -454,11 +466,11 @@ class OnlinePoissonMF(PoissonMF):
 
     def _stoch_bound(self, X, istart, iend):
         bound = np.sum(X * np.log(self._xexplog(istart, iend)) - self.Et[istart:iend].dot(self.Eb))
-        bound += _gamma_term(self.a, self.a * self.c, self.gamma_t[istart:iend], self.rho_t[istart:iend],
+        bound += _gamma_term(self.a, self.Ea[istart:iend], self.gamma_t[istart:iend], self.rho_t[istart:iend],
                              self.Et[istart:iend], self.Elogt[istart:iend])
-        bound += self.n_components * X.shape[0] * self.a * np.log(self.c)
+        # bound += self.n_components * X.shape[0] * self.a * np.log(self.c)
         bound *= self._scale
-        bound += _gamma_term(self.c, self.c, self.gamma_b, self.rho_b,
+        bound += _gamma_term(self.c, self.Ep, self.gamma_b, self.rho_b,
                              self.Eb, self.Elogb)
         return bound
 
@@ -472,9 +484,12 @@ class OnlinePoissonMF(PoissonMF):
         ratio = X / self._xexplog(istart, iend)
         self.gamma_t[istart:iend] = self.a + np.exp(self.Elogt[istart:iend]) * np.dot(ratio, np.exp(self.Elogb).T)
         # self.rho_t[istart:iend] = self.a * self.c + np.sum(self.Eb, axis=1)
-        self.rho_t[istart:iend] = self.Ea[istart:iend] * self.c + np.sum(self.Eb, axis=1)
+        # self.rho_t[istart:iend] = self.Ea[istart:iend] * self.c + np.sum(self.Eb, axis=1)
+        self.rho_t[istart:iend] = self.Ea[istart:iend] + np.sum(self.Eb, axis=1)
+        # print self.Et[istart:iend].shape
         self.Et[istart:iend], self.Elogt[istart:iend] = _compute_expectations(self.gamma_t[istart:iend], self.rho_t[istart:iend])
-        self.c = 1. / np.mean(self.Et[istart:iend])
+        # print self.Et[istart:iend].shape
+        # self.c = 1. / np.mean(self.Et[istart:iend])
 
     def _update_zai(self, X, istart, iend):
         ratio = X / self._xexplog(istart, iend)
@@ -492,11 +507,11 @@ class OnlinePoissonMF(PoissonMF):
 
     def _bound(self, X, istart, iend):
         bound = np.sum(X * np.log(self._xexplog(istart, iend)) - self.Et[istart:iend].dot(self.Eb))
-        bound += _gamma_term(self.a, self.a * self.c,
+        bound += _gamma_term(self.a, self.Ea[istart:iend],
                              self.gamma_t[istart:iend], self.rho_t[istart:iend],
                              self.Et[istart:iend], self.Elogt[istart:iend])
-        bound += self.n_components * X.shape[0] * self.a * np.log(self.c)
-        bound += _gamma_term(self.c, self.c, self.gamma_b, self.rho_b,
+        # bound += self.n_components * X.shape[0] * self.a * np.log(self.c)
+        bound += _gamma_term(self.c, self.Ep, self.gamma_b, self.rho_b,
                              self.Eb, self.Elogb)
         return bound
 
