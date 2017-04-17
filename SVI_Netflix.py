@@ -16,6 +16,7 @@ from edward.models import Gamma, Poisson, Normal
 # from scipy.stats import poisson
 from Read_Netflix_data import Create_Mapping_Customer, Create_Data_Set
 import pmf_modified
+import pmf_activity_popularity
 
 def build_toy_dataset(U, V):
   R = np.dot(V, U)
@@ -51,80 +52,23 @@ def build_small_dataset():
 sess = ed.get_session()
 
 
-Num_Movies = 1000
+Num_Movies = 200
 Num_Customer = 10000
-Latent_Factors = 900
-
-# Create_Mapping_Customer(Num_Customer, Num_Movies)
-# Create_Data_Set(Num_Customer, Num_Movies)
+Latent_Factors = 150
+B = 5
+max_iter = 20
+n_pass = 2
+# # Create_Mapping_Customer(Num_Customer, Num_Movies)
+# # Create_Data_Set(Num_Customer, Num_Movies)
 Training_Data = "Netflix_train.npy"
 X_train = np.load(Training_Data)
-X_train = X_train[0:Num_Customer]
-X_train = X_train[:,0:Num_Movies]
-
-pmf_var = pmf_modified.OnlinePoissonMF(n_components=Latent_Factors, batch_size=10, n_pass=10, max_iter=20, tol=0.0005, smoothness=100, verbose=True)
-
-# pmf_var.fit_Netflix(Num_Customer, Num_Movies)
-pmf_var.fit(X_train)
-
-a_u = pmf_var.gamma_b
-b_u = pmf_var.rho_b
-
-a_v = pmf_var.gamma_t
-b_v = pmf_var.rho_t
-
-qU = Gamma(alpha=a_u, beta=b_u)
-qV = Gamma(alpha=a_v, beta=b_v)
-
-qU_sample = qU.sample()
-qV_sample = qV.sample()
-
-X_new = np.zeros((Num_Customer,Num_Movies))
-
-n_sample = 1000
-for i in range(n_sample):
-	avg_U = qU_sample.eval()
-	avg_V = qV_sample.eval()
-	temp = np.dot(avg_V, avg_U)
-	X_new += np.random.poisson(temp)
-	# X_new2 += temp
-
-X_new = np.round(X_new / n_sample, 1)
-
-rmse = 0
-tot = 0
-for i in range(Num_Customer):
-	for j in range(Num_Movies):
-		if X_train[i][j] == 0:
-			continue
-		rmse += (X_train[i][j] - X_new[i][j])**2
-		tot += 1
-
-rmse = math.sqrt(1.0*rmse / tot)
-print rmse
+X_train = X_train[0:Num_Customer,0:Num_Movies]
 
 
+# pmf_var = pmf_modified.OnlinePoissonMF(n_components=Latent_Factors, batch_size=5, n_pass=2, max_iter=10, tol=0.0005, smoothness=100, verbose=True)
 
-
-
-
-
-
-# print X_new / n_sample
-# print X_train
-# print np.round(X_new / n_sample, 1)
-
-# X_train, N, M = build_small_dataset()
-# N = 10
-# M = 8
-# D = 6
-# U = build_Matrix(D, M)
-# V = build_Matrix(N, D)
-# X_train = np.dot(V, U)
-# pmf_var = pmf_modified.OnlinePoissonMF(n_components=D,  batch_size=2, max_iter=1000, tol=0.0005,  smoothness=100, verbose=True, n_pass=20)
-
+# # pmf_var.fit_Netflix(Num_Customer, Num_Movies)
 # pmf_var.fit(X_train)
-# # print pmf_var.transform(X_train)
 
 # a_u = pmf_var.gamma_b
 # b_u = pmf_var.rho_b
@@ -138,7 +82,7 @@ print rmse
 # qU_sample = qU.sample()
 # qV_sample = qV.sample()
 
-# X_new = np.zeros((N,M))
+# X_new = np.zeros((Num_Customer,Num_Movies))
 
 # n_sample = 1000
 # for i in range(n_sample):
@@ -149,18 +93,127 @@ print rmse
 # 	# X_new2 += temp
 
 # X_new = np.round(X_new / n_sample, 1)
-# print X_train
-# print X_new
 
 # rmse = 0
 # tot = 0
-# for i in range(N):
-# 	for j in range(M):
+# for i in range(Num_Customer):
+# 	for j in range(Num_Movies):
 # 		if X_train[i][j] == 0:
 # 			continue
-# 		rmse += (X_train[i][j] - X_new[i][j])*2
+# 		rmse += (X_train[i][j] - X_new[i][j])**2
 # 		tot += 1
 
-# print tot
 # rmse = math.sqrt(1.0*rmse / tot)
 # print rmse
+
+
+
+
+
+
+
+
+# print X_new / n_sample
+# print X_train
+# print np.round(X_new / n_sample, 1)
+
+# X_train, N, M = build_small_dataset()
+# N = 50
+# M = 40
+# D = 30
+# U = build_Matrix(D, M)
+# V = build_Matrix(N, D)
+# X_train = np.dot(V, U)
+# X_train = build_Matrix(N, M)
+N = Num_Customer
+M = Num_Movies
+D = Latent_Factors
+
+pmf_var = pmf_modified.OnlinePoissonMF(n_components=D,  batch_size=B, max_iter=max_iter, tol=0.0005,  smoothness=100, verbose=True, n_pass=n_pass)
+
+pmf_var.fit(X_train)
+# print pmf_var.transform(X_train)
+
+a_u = pmf_var.gamma_b
+b_u = pmf_var.rho_b
+
+a_v = pmf_var.gamma_t
+b_v = pmf_var.rho_t
+
+qU = Gamma(alpha=a_u, beta=b_u)
+qV = Gamma(alpha=a_v, beta=b_v)
+
+qU_sample = qU.sample()
+qV_sample = qV.sample()
+
+X_new = np.zeros((N,M))
+
+n_sample = 1000
+for i in range(n_sample):
+	avg_U = qU_sample.eval()
+	avg_V = qV_sample.eval()
+	temp = np.dot(avg_V, avg_U)
+	X_new += np.random.poisson(temp)
+	# X_new2 += temp
+
+X_new = np.round(X_new / n_sample, 1)
+# print X_train
+# print X_new
+
+rmse = 0
+tot = 0
+for i in range(N):
+	for j in range(M):
+		if X_train[i][j] == 0:
+			continue
+		rmse += (X_train[i][j] - X_new[i][j])**2
+		tot += 1
+
+
+rmse = math.sqrt(1.0*rmse / tot)
+# print rmse
+
+pmf_var = pmf_activity_popularity.OnlinePoissonMF(n_components=D,  batch_size=B, max_iter=max_iter, tol=0.0005,  smoothness=100, verbose=True, n_pass=n_pass)
+
+pmf_var.fit(X_train)
+# print pmf_var.transform(X_train)
+a_u = pmf_var.gamma_b
+b_u = pmf_var.rho_b
+
+a_v = pmf_var.gamma_t
+b_v = pmf_var.rho_t
+
+qU = Gamma(alpha=a_u, beta=b_u)
+qV = Gamma(alpha=a_v, beta=b_v)
+
+qU_sample = qU.sample()
+qV_sample = qV.sample()
+
+X_new = np.zeros((N,M))
+
+n_sample = 1000
+for i in range(n_sample):
+	avg_U = qU_sample.eval()
+	avg_V = qV_sample.eval()
+	temp = np.dot(avg_V, avg_U)
+	X_new += np.random.poisson(temp)
+	# X_new2 += temp
+
+X_new = np.round(X_new / n_sample, 1)
+# print X_train
+# print X_new
+
+rmse2 = 0
+tot = 0
+for i in range(N):
+	for j in range(M):
+		if X_train[i][j] == 0:
+			continue
+		rmse2 += (X_train[i][j] - X_new[i][j])**2
+		tot += 1
+
+
+rmse2 = math.sqrt(1.0*rmse2 / tot)
+
+print rmse
+print rmse2

@@ -320,48 +320,7 @@ class OnlinePoissonMF(PoissonMF):
                 self.bound.append(self._stoch_bound(mini_batch))
         return self
 
-    def fit2(self, X, n_samples, n_feats, est_total=None):
-        '''Fit the model to the data in X. X has to be loaded into memory.
-
-        Parameters
-        ----------
-        X : array-like, shape (n_samples, n_feats)
-            Training data.
-
-        est_total : int
-            The estimated size of the entire data. Could be larger than the
-            actual size.
-
-        Returns
-        -------
-        self: object
-            Returns the instance itself.
-        '''
-        # n_samples, n_feats = X.shape
-        if est_total is None:
-            self._scale = float(n_samples) / self.batch_size
-        else:
-            self._scale = float(est_total) / self.batch_size
-        self._init_components(n_feats)
-        self.bound = list()
-        for count in xrange(self.n_pass):
-            if self.verbose:
-                print 'Iteration %d: passing through the data...' % count
-            indices = np.arange(n_samples)
-            if self.shuffle:
-                np.random.shuffle(indices)
-            X_shuffled = X[indices]
-            for (i, istart) in enumerate(xrange(0, n_samples,
-                                                self.batch_size), 1):
-                print '\tMinibatch %d:' % i
-                iend = min(istart + self.batch_size, n_samples)
-                self.set_learning_rate(iter=i)
-                # mini_batch = X_shuffled[istart: iend]
-                mini_batch = GetMiniBatch(batch_size, i)
-                self.partial_fit(mini_batch)
-                self.bound.append(self._stoch_bound(mini_batch))
-        return self
-
+    
     def partial_fit(self, X):
         '''Fit the data in X as a mini-batch and update the parameter by taking
         a natural gradient step. Could be invoked from a high-level out-of-core

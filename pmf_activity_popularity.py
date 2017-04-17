@@ -327,9 +327,9 @@ class OnlinePoissonMF(PoissonMF):
         self._init_weights(n_samples)
         
         #Update Activity and Popularity shape parameter
-        self.gamma_p = np.repeat(self.c_prime + self.n_components*self.c, n_feats).reshape((1, n_feats))
-        # self.gamma_p = self.c_prime + self.n_components*self.c
-
+        # self.gamma_p = np.repeat(self.c_prime + self.n_components*self.c, n_feats).reshape((1, n_feats))
+        self.gamma_a = self.a_prime + self.n_components*self.a
+        self.gamma_p = self.c_prime + self.n_components*self.c
         self.cound = list()
         for count in xrange(self.n_pass):
             if self.verbose:
@@ -493,7 +493,7 @@ class OnlinePoissonMF(PoissonMF):
 
     def _update_zai(self, X, istart, iend):
         ratio = X / self._xexplog(istart, iend)
-        self.gamma_a[istart:iend] = self.a_prime + self.n_components*self.a
+        # self.gamma_a[istart:iend] = self.a_prime + self.n_components*self.a
         # self.rho_t[istart:iend] = self.a * self.c + np.sum(self.Eb, axis=1)
         # print self.rho_a[istart:iend].shape
         # print self.rho_a[istart:iend]
@@ -502,7 +502,7 @@ class OnlinePoissonMF(PoissonMF):
         # temp = self.Et[istart:iend]
         # temp =temp.reshape((iend-istart,1))
         self.rho_a[istart:iend] = (1.0*self.a_prime / self.c_prime) + np.sum(self.Et[istart:iend], axis=1).reshape((iend-istart, 1))
-        self.Ea[istart:iend], self.Eloga[istart:iend] = _compute_expectations(self.gamma_a[istart:iend], self.rho_a[istart:iend])
+        self.Ea[istart:iend], self.Eloga[istart:iend] = _compute_expectations(self.gamma_a, self.rho_a[istart:iend])
         # self.c = 1. / np.mean(self.Et[istart:iend])
 
     def _bound(self, X, istart, iend):
