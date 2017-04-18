@@ -126,7 +126,7 @@ class PoissonMF(BaseEstimator, TransformerMixin):
             * np.random.gamma(self.smoothness, 1. / self.smoothness,
                               size=(n_samples, self.n_components))
         self.Et, self.Elogt = _compute_expectations(self.gamma_t, self.rho_t)
-        # self.c = 1. / np.mean(self.Et)
+        self.c_ = 1. / np.mean(self.Et)
 
     def fit(self, X):
         '''Fit the model to the data in X.
@@ -341,7 +341,7 @@ class OnlinePoissonMF(PoissonMF):
                 self.set_learning_rate(iter=i)
                 mini_batch = X[istart:iend]
                 self.partial_fit(mini_batch, istart, iend)
-                self.cound.append(self._stoch_bound(mini_batch, istart, iend))
+                # self.cound.append(self._stoch_bound(mini_batch, istart, iend))
         return self
 
     
@@ -409,8 +409,9 @@ class OnlinePoissonMF(PoissonMF):
         if not hasattr(self, 'Eb'):
             raise ValueError('There are no pre-trained components.')
         n_samples, n_feats = X.shape
+        self.Ea[istart:iend], self.Eloga[istart:iend] = _compute_expectations(self.gamma_a, self.rho_a[istart:iend])
         self.Et[istart:iend], self.Elogt[istart:iend] = _compute_expectations(self.gamma_t[istart:iend], self.rho_t[istart:iend])
-        # self.c = 1. / np.mean(self.Et[istart:iend])
+        # self.c_ = 1. / np.mean(self.Et[istart:iend])
         if n_feats != self.Eb.shape[1]:
             raise ValueError('The dimension of the transformed data '
                              'does not match with the existing components.')
@@ -422,21 +423,22 @@ class OnlinePoissonMF(PoissonMF):
         # alternating between update latent components and weights
         old_bd = -np.inf
         for i in xrange(self.max_iter):
-            self._update_theta(X, istart, iend)
+            # for j in xrange(self.max_iter):
             self._update_zai(X, istart, iend)
-            bound = self._bound(X, istart, iend)
-            improvement = (bound - old_bd) / abs(old_bd)
-            if self.verbose:
-                sys.stdout.write('\r\tAfter ITERATION: %d\tObjective: %.2f\t'
-                                 'Old objective: %.2f\t'
-                                 'Improvement: %.5f' % (i, bound, old_bd,
-                                                        improvement))
-                sys.stdout.flush()
-            if improvement < self.tol:
-                break
-            old_bd = bound
-        if self.verbose:
-            sys.stdout.write('\n')
+            self._update_theta(X, istart, iend)
+        #     bound = self._bound(X, istart, iend)
+        #     improvement = (bound - old_bd) / abs(old_bd)
+        #     if self.verbose:
+        #         sys.stdout.write('\r\tAfter ITERATION: %d\tObjective: %.2f\t'
+        #                          'Old objective: %.2f\t'
+        #                          'Improvement: %.5f' % (i, bound, old_bd,
+        #                                                 improvement))
+        #         sys.stdout.flush()
+        #     if improvement < self.tol:
+        #         break
+        #     old_bd = bound
+        # if self.verbose:
+        #     sys.stdout.write('\n')
         pass
 
     def set_learning_rate(self, iter=None, rho=None):
@@ -468,7 +470,7 @@ class OnlinePoissonMF(PoissonMF):
         bound = np.sum(X * np.log(self._xexplog(istart, iend)) - self.Et[istart:iend].dot(self.Eb))
         bound += _gamma_term(self.a, self.Ea[istart:iend], self.gamma_t[istart:iend], self.rho_t[istart:iend],
                              self.Et[istart:iend], self.Elogt[istart:iend])
-        # bound += self.n_components * X.shape[0] * self.a * np.log(self.c)
+        # bound += self.n_components * X.shape[0] * self.a * np.log(self.c_)
         bound *= self._scale
         bound += _gamma_term(self.c, self.Ep, self.gamma_b, self.rho_b,
                              self.Eb, self.Elogb)
@@ -489,7 +491,7 @@ class OnlinePoissonMF(PoissonMF):
         # print self.Et[istart:iend].shape
         self.Et[istart:iend], self.Elogt[istart:iend] = _compute_expectations(self.gamma_t[istart:iend], self.rho_t[istart:iend])
         # print self.Et[istart:iend].shape
-        # self.c = 1. / np.mean(self.Et[istart:iend])
+        # self.c_ = 1. / np.mean(self.Et[istart:iend])
 
     def _update_zai(self, X, istart, iend):
         ratio = X / self._xexplog(istart, iend)
@@ -503,14 +505,17 @@ class OnlinePoissonMF(PoissonMF):
         # temp =temp.reshape((iend-istart,1))
         self.rho_a[istart:iend] = (1.0*self.a_prime / self.c_prime) + np.sum(self.Et[istart:iend], axis=1).reshape((iend-istart, 1))
         self.Ea[istart:iend], self.Eloga[istart:iend] = _compute_expectations(self.gamma_a, self.rho_a[istart:iend])
-        # self.c = 1. / np.mean(self.Et[istart:iend])
+        # self.c_ = 1. / np.mean(self.Et[istart:iend])
 
     def _bound(self, X, istart, iend):
         bound = np.sum(X * np.log(self._xexplog(istart, iend)) - self.Et[istart:iend].dot(self.Eb))
         bound += _gamma_term(self.a, self.Ea[istart:iend],
                              self.gamma_t[istart:iend], self.rho_t[istart:iend],
                              self.Et[istart:iend], self.Elogt[istart:iend])
-        # bound += self.n_components * X.shape[0] * self.a * np.log(self.c)
+        # bound += _gamma_term(self.a, self.Ea[istart:iend],
+        #                      self.gamma_t[istart:iend], self.rho_t[istart:iend],
+        #                      self.Et[istart:iend], self.Elogt[istart:iend])
+        # bound += self.n_components * X.shape[0] * self.a * np.log(self.c_)
         bound += _gamma_term(self.c, self.Ep, self.gamma_b, self.rho_b,
                              self.Eb, self.Elogb)
         return bound
