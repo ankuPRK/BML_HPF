@@ -52,9 +52,9 @@ def build_small_dataset():
 sess = ed.get_session()
 
 
-Num_Movies = 100
-Num_Customer = 1000
-Latent_Factors = 50
+Num_Movies = 200
+Num_Customer = 10000
+Latent_Factors = 150
 B = 5
 max_iter = 5
 n_pass = 3
@@ -138,7 +138,7 @@ N = Num_Customer
 M = Num_Movies
 D = Latent_Factors
 
-pmf_var = pmf_modified.OnlinePoissonMF(n_components=D,  batch_size=B, max_iter=max_iter, tol=0.0005,  smoothness=100, verbose=False, n_pass=n_pass)
+pmf_var = pmf_modified.OnlinePoissonMF(n_components=D,  batch_size=B, max_iter=max_iter, tol=0.0005,  smoothness=100, verbose=True, n_pass=n_pass)
 
 pmf_var.fit(X_train)
 # print pmf_var.transform(X_train)
@@ -187,7 +187,7 @@ rmse = math.sqrt(1.0*rmse / tot)
 acc = 1.0*corr / tot
 
 
-pmf_var = pmf_activity_popularity.OnlinePoissonMF(n_components=D,  batch_size=B, max_iter=100*max_iter, tol=0.0005,  smoothness=100, verbose=True, n_pass=2*n_pass)
+pmf_var = pmf_activity_popularity.OnlinePoissonMF(n_components=D,  batch_size=B, max_iter=100*max_iter, tol=0.0005,  smoothness=100, verbose=True, n_pass=3*n_pass)
 
 pmf_var.fit(X_train)
 # print pmf_var.transform(X_train)
